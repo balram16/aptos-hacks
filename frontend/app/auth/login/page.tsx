@@ -12,22 +12,31 @@ import { useToast } from "@/components/ui/use-toast"
 import { Loader } from "@/components/ui/loader"
 import { WalletButton } from "@/components/wallet/wallet-button"
 import { useWalletContext } from "@/context/wallet-context"
+import { AbhaConsentModal } from "@/components/abha/abha-consent-modal"
 
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { isConnected, userType, setUserType } = useWalletContext()
+  const { isConnected, userType, setUserType, hasAbhaConsent } = useWalletContext()
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [showAbhaModal, setShowAbhaModal] = useState(false)
 
   // Handle wallet connection success
   useEffect(() => {
     if (isConnected && userType) {
+      // For users, check ABHA consent before redirecting
+      if (userType === "user" && !hasAbhaConsent) {
+        setShowAbhaModal(true)
+        return
+      }
+      
+      // For admin or user with ABHA consent, proceed to dashboard
       setIsTransitioning(true)
       
       setTimeout(() => {
         setIsTransitioning(false)
         toast({
-          title: "Wallet Connected",
+          title: "Login Successful",
           description: "Welcome to ChainSure!",
         })
         
@@ -35,19 +44,39 @@ export default function LoginPage() {
         if (userType === "user") {
           router.push("/dashboard/user")
         } else {
-          router.push("/dashboard/provider")
+          router.push("/dashboard/admin")
         }
       }, 1500)
     }
-  }, [isConnected, userType, router, toast])
+  }, [isConnected, userType, hasAbhaConsent, router, toast])
 
-  const handleUserTypeSelection = (type: "user" | "insurer") => {
+  const handleAbhaConsentSuccess = () => {
+    // Close modal and proceed to user dashboard
+    setShowAbhaModal(false)
+    setIsTransitioning(true)
+    
+    setTimeout(() => {
+      setIsTransitioning(false)
+      toast({
+        title: "Login Successful",
+        description: "Welcome to ChainSure!",
+      })
+      router.push("/dashboard/user")
+    }, 1500)
+  }
+
+  const handleUserTypeSelection = (type: "user" | "admin") => {
     setUserType(type)
   }
 
   return (
     <>
       {isTransitioning && <Loader />}
+      <AbhaConsentModal 
+        isOpen={showAbhaModal}
+        onClose={() => setShowAbhaModal(false)}
+        onSuccess={handleAbhaConsentSuccess}
+      />
       <div className="min-h-screen flex">
         {/* Left side - Form */}
         <div className="flex-1 flex items-center justify-center p-8">
@@ -63,7 +92,7 @@ export default function LoginPage() {
                     height={48}
                     className="mx-auto rounded-xl mb-4"
                   />
-                  <h1 className="text-2xl font-bold mb-2">Welcome to ChainSure</h1>
+                  <h1 className="text-2xl font-bold mb-2" onClick={() => router.push("/")}>Welcome to ChainSure</h1>
                   <p className="text-gray-600 dark:text-gray-400">Choose how you want to continue</p>
                 </div>
 
@@ -90,22 +119,22 @@ export default function LoginPage() {
                   </Button>
 
                   <Button
-                    onClick={() => handleUserTypeSelection("insurer")}
+                    onClick={() => handleUserTypeSelection("admin")}
                     className="h-auto p-4 bg-gradient-to-r from-[#07a6ec] to-[#07c6ec]"
                   >
                     <div className="flex items-center gap-4">
                       <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
                         <Image
                           src="https://i.ibb.co/XZP3h1bN/claimsaathi-neutral-firm.png"
-                          alt="Insurer"
+                          alt="Admin"
                           width={40}
                           height={40}
                           className="rounded-full"
                         />
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold">I'm an Insurance Provider</h3>
-                        <p className="text-sm text-white/80">Manage and process claims</p>
+                        <h3 className="font-semibold">I'm an Admin</h3>
+                        <p className="text-sm text-white/80">Create and manage policies</p>
                       </div>
                     </div>
                   </Button>
@@ -125,12 +154,12 @@ export default function LoginPage() {
                 
                 <div className="text-center mb-8">
                   <h1 className="text-2xl font-bold">
-                    {userType === "user" ? "Policyholder Login" : "Insurance Provider Login"}
+                    {userType === "user" ? "Policyholder Login" : "Admin Login"}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400">
                     {userType === "user" 
-                      ? "Connect your Petra wallet to access your claims dashboard" 
-                      : "Connect your Petra wallet to access your claims management system"}
+                      ? "Connect your Petra wallet to access your policy dashboard" 
+                      : "Connect your Petra wallet to access the admin panel"}
                   </p>
                 </div>
 
@@ -226,3 +255,4 @@ export default function LoginPage() {
     </>
   )
 }
+

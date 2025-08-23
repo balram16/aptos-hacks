@@ -7,19 +7,22 @@ import { useRouter } from "next/navigation"
 interface WalletContextType {
   isConnected: boolean
   address: string | null
-  userType: "user" | "insurer" | null
-  setUserType: (type: "user" | "insurer" | null) => void
+  userType: "user" | "admin" | null
+  setUserType: (type: "user" | "admin" | null) => void
   connectWallet: () => Promise<void>
   disconnectWallet: () => Promise<void>
   isLoading: boolean
+  hasAbhaConsent: boolean
+  setHasAbhaConsent: (consent: boolean) => void
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
 
 export function WalletContextProvider({ children }: { children: React.ReactNode }) {
   const { connect, disconnect, account, connected, wallet } = useWallet()
-  const [userType, setUserType] = useState<"user" | "insurer" | null>(null)
+  const [userType, setUserType] = useState<"user" | "admin" | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [hasAbhaConsent, setHasAbhaConsent] = useState(false)
   const router = useRouter()
 
   const connectWallet = async () => {
@@ -55,13 +58,28 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     }
   }, [userType])
 
-  // Restore user type from localStorage
+  // Restore user type and ABHA consent from localStorage
   useEffect(() => {
     const storedUserType = localStorage.getItem("chainsure-user-type")
-    if (storedUserType && (storedUserType === "user" || storedUserType === "insurer")) {
+    const storedAbhaConsent = localStorage.getItem("chainsure-abha-consent")
+    
+    if (storedUserType && (storedUserType === "user" || storedUserType === "admin")) {
       setUserType(storedUserType)
     }
+    
+    if (storedAbhaConsent === "true") {
+      setHasAbhaConsent(true)
+    }
   }, [])
+
+  // Store ABHA consent in localStorage
+  useEffect(() => {
+    if (hasAbhaConsent) {
+      localStorage.setItem("chainsure-abha-consent", "true")
+    } else {
+      localStorage.removeItem("chainsure-abha-consent")
+    }
+  }, [hasAbhaConsent])
 
   const value: WalletContextType = {
     isConnected: connected,
@@ -71,6 +89,8 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     connectWallet,
     disconnectWallet,
     isLoading,
+    hasAbhaConsent,
+    setHasAbhaConsent,
   }
 
   return (

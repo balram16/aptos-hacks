@@ -87,7 +87,7 @@ export default function DashboardHeader() {
         {/* Right side actions */}
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold hidden md:block">
-            {userType === "user" ? "Policyholder Dashboard" : "Provider Dashboard"}
+            {userType === "user" ? "Policyholder Dashboard" : "Admin Dashboard"}
           </h2>
           
           <div className="flex items-center gap-2 ml-auto">

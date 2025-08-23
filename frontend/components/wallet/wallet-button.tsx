@@ -48,13 +48,10 @@ export function WalletButton({ className, variant = "default", size = "default" 
     }
   }
 
-  const formatAddress = (addr?: string) => {
-    console.log(addr)
-    if (!addr || addr.length < 8) return addr || ""
-  
-    const safeAddr: string = addr // narrow type
-    return `${safeAddr.slice(0, 6)}...${safeAddr.slice(-4)}`
-  }
+  // const formatAddress = (addr?: string) => {
+  //   if (!addr || addr.length < 8) return addr || ""
+  //   return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+  // }
 
   if (isConnected && address) {
     return (

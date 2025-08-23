@@ -18,7 +18,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex items-center justify-between border-b px-6 py-3">
             {/* Left side - Header */}
-            <DashboardHeader />
+            {/* <DashboardHeader /> */}
 
             {/* Right side - Feature Indicators */}
             <div className="flex items-center gap-4">
