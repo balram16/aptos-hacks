@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { ChatbotProvider } from "@/components/chatbot/chatbot-provider"
 import { LoadingProvider } from "@/providers/loading-provider"
+import { WalletProvider } from "@/providers/wallet-provider"
+import { WalletContextProvider } from "@/context/wallet-context"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -29,12 +31,16 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <LoadingProvider>
-            <ChatbotProvider>
-              {children}
-              <Toaster />
-            </ChatbotProvider>
-          </LoadingProvider>
+          <WalletProvider>
+            <WalletContextProvider>
+              <LoadingProvider>
+                <ChatbotProvider>
+                  {children}
+                  <Toaster />
+                </ChatbotProvider>
+              </LoadingProvider>
+            </WalletContextProvider>
+          </WalletProvider>
         </ThemeProvider>
       </body>
     </html>

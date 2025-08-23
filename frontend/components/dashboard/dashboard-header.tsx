@@ -17,9 +17,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { WalletButton } from "@/components/wallet/wallet-button"
+import { useWalletContext } from "@/context/wallet-context"
 
 export default function DashboardHeader() {
   const router = useRouter()
+  const { isConnected, userType } = useWalletContext()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
 
@@ -83,7 +86,9 @@ export default function DashboardHeader() {
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold">Dashboard</h2>
+          <h2 className="text-lg font-semibold hidden md:block">
+            {userType === "user" ? "Policyholder Dashboard" : "Provider Dashboard"}
+          </h2>
           
           <div className="flex items-center gap-2 ml-auto">
             <Button variant="ghost" size="icon" className="relative">
@@ -93,6 +98,7 @@ export default function DashboardHeader() {
               </span>
             </Button>
             <ModeToggle />
+            <WalletButton variant="outline" size="sm" className="hidden md:block" />
           </div>
         </div>
       </div>
@@ -101,6 +107,9 @@ export default function DashboardHeader() {
       {isMobileMenuOpen && (
         <div className="md:hidden border-t">
           <nav className="flex flex-col p-4 space-y-4">
+            <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 mb-2">
+              <WalletButton variant="outline" size="sm" className="w-full" />
+            </div>
             <Link
               href="/dashboard"
               className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted"

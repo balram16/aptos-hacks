@@ -2,120 +2,47 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Fingerprint, ArrowLeft, Zap, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Wallet } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader } from "@/components/ui/loader"
+import { WalletButton } from "@/components/wallet/wallet-button"
+import { useWalletContext } from "@/context/wallet-context"
 
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [loginMethod, setLoginMethod] = useState<"password" | "otp" | "biometric">("password")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [otp, setOtp] = useState(["", "", "", ""])
-  const [phoneNumber, setPhoneNumber] = useState("")
+  const { isConnected, userType, setUserType } = useWalletContext()
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const [userType, setUserType] = useState<"user" | "insurer" | null>(null)
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) {
-      value = value[0]
+  // Handle wallet connection success
+  useEffect(() => {
+    if (isConnected && userType) {
+      setIsTransitioning(true)
+      
+      setTimeout(() => {
+        setIsTransitioning(false)
+        toast({
+          title: "Wallet Connected",
+          description: "Welcome to ChainSure!",
+        })
+        
+        // Redirect based on user type
+        if (userType === "user") {
+          router.push("/dashboard/user")
+        } else {
+          router.push("/dashboard/provider")
+        }
+      }, 1500)
     }
+  }, [isConnected, userType, router, toast])
 
-    const newOtp = [...otp]
-    newOtp[index] = value
-    setOtp(newOtp)
-
-    // Auto-focus next input
-    if (value && index < 3) {
-      const nextInput = document.getElementById(`otp-${index + 1}`)
-      if (nextInput) {
-        nextInput.focus()
-      }
-    }
-  }
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsTransitioning(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsTransitioning(false)
-      toast({
-        title: "Login successful",
-        description: "Welcome back to ChainSure!",
-      })
-      // Redirect based on user type
-      if (userType === "user") {
-        router.push("/dashboard/user")
-      } else {
-        router.push("/dashboard/provider")
-      }
-    }, 2500) // Increased time to show loading state
-  }
-
-  const handleBiometricLogin = async () => {
-    setIsLoading(true)
-
-    // Simulate biometric authentication
-    setTimeout(() => {
-      setIsLoading(false)
-      toast({
-        title: "Biometric authentication successful",
-        description: "Welcome back to ChainSure!",
-      })
-      // Redirect based on user type
-      if (userType === "user") {
-        router.push("/dashboard/user")
-      } else {
-        router.push("/dashboard/provider")
-      }
-    }, 1500)
-  }
-
-  const handleSendOtp = async () => {
-    setIsLoading(true)
-
-    // Simulate sending OTP
-    setTimeout(() => {
-      setIsLoading(false)
-      toast({
-        title: "OTP sent",
-        description: `A verification code has been sent to ${phoneNumber}`,
-      })
-      setLoginMethod("otp")
-    }, 1000)
-  }
-
-  const handleVerifyOtp = async () => {
-    setIsLoading(true)
-
-    // Simulate OTP verification
-    setTimeout(() => {
-      setIsLoading(false)
-      toast({
-        title: "OTP verified",
-        description: "Welcome back to ChainSure!",
-      })
-      // Redirect based on user type
-      if (userType === "user") {
-        router.push("/dashboard/user")
-      } else {
-        router.push("/dashboard/provider")
-      }
-    }, 1500)
+  const handleUserTypeSelection = (type: "user" | "insurer") => {
+    setUserType(type)
   }
 
   return (
@@ -142,7 +69,7 @@ export default function LoginPage() {
 
                 <div className="grid gap-4">
                   <Button
-                    onClick={() => setUserType("user")}
+                    onClick={() => handleUserTypeSelection("user")}
                     className="h-auto p-4 bg-gradient-to-r from-[#fa6724] to-[#fa8124]"
                   >
                     <div className="flex items-center gap-4">
@@ -163,7 +90,7 @@ export default function LoginPage() {
                   </Button>
 
                   <Button
-                    onClick={() => setUserType("insurer")}
+                    onClick={() => handleUserTypeSelection("insurer")}
                     className="h-auto p-4 bg-gradient-to-r from-[#07a6ec] to-[#07c6ec]"
                   >
                     <div className="flex items-center gap-4">
@@ -185,7 +112,7 @@ export default function LoginPage() {
                 </div>
               </div>
             ) : (
-              // Existing Login Form with back button
+              // Wallet Connection Interface
               <div>
                 <Button
                   variant="ghost"
@@ -196,182 +123,66 @@ export default function LoginPage() {
                   Back
                 </Button>
                 
-                {/* Existing login form code */}
                 <div className="text-center mb-8">
                   <h1 className="text-2xl font-bold">
                     {userType === "user" ? "Policyholder Login" : "Insurance Provider Login"}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400">
                     {userType === "user" 
-                      ? "Access your claims dashboard" 
-                      : "Access your claims management system"}
+                      ? "Connect your Petra wallet to access your claims dashboard" 
+                      : "Connect your Petra wallet to access your claims management system"}
                   </p>
                 </div>
 
-                <Tabs defaultValue="password" className="w-full">
-                  <TabsList className="grid grid-cols-3 mb-8">
-                    <TabsTrigger value="password" onClick={() => setLoginMethod("password")}>
-                      Password
-                    </TabsTrigger>
-                    <TabsTrigger value="otp" onClick={() => setLoginMethod("password")}>
-                      OTP
-                    </TabsTrigger>
-                    <TabsTrigger value="biometric" onClick={() => setLoginMethod("biometric")}>
-                      Biometric
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="password">
-                    <form onSubmit={handleLogin} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="name@example.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <Label htmlFor="password">Password</Label>
-                          <Link href="/auth/forgot-password" className="text-sm text-[#07a6ec] hover:underline">
-                            Forgot password?
-                          </Link>
-                        </div>
-                        <div className="relative">
-                          <Input
-                            id="password"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-0 top-0 h-full px-3"
-                            onClick={() => setShowPassword(!showPassword)}
+                <div className="space-y-6 text-center">
+                  <div className="mx-auto w-32 h-32 rounded-full bg-gradient-to-br from-[#fa6724] to-[#07a6ec] p-1">
+                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                      <Image
+                        src="https://i.ibb.co/8nHxb4zN/claimsaathi-snapping-winking.png"
+                        alt="Claim Saathi"
+                        width={120}
+                        height={120}
+                        className="rounded-full"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Connect Your Petra Wallet</h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm max-w-sm mx-auto">
+                      Secure, decentralized authentication powered by Aptos blockchain. 
+                      Your wallet is your identity on ChainSure.
+                    </p>
+                    
+                    <div className="pt-4">
+                      <WalletButton 
+                        className="w-full h-12 text-base bg-[#fa6724] hover:bg-[#e55613]"
+                        size="lg"
+                      />
+                    </div>
+                    
+                    {!isConnected && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                        <p>Don't have Petra wallet? 
+                          <a 
+                            href="https://petra.app/" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[#07a6ec] hover:underline ml-1"
                           >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="remember" />
-                        <label
-                          htmlFor="remember"
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          Remember me
-                        </label>
-                      </div>
-                      <Button type="submit" className="w-full bg-[#fa6724] hover:bg-[#e55613]" disabled={isLoading}>
-                        {isLoading ? "Logging in..." : "Log in"}
-                      </Button>
-                    </form>
-                  </TabsContent>
-
-                  <TabsContent value="otp">
-                    {loginMethod === "password" ? (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="phone">Phone Number</Label>
-                          <Input
-                            id="phone"
-                            type="tel"
-                            placeholder="+91 9876543210"
-                            value={phoneNumber}
-                            onChange={(e) => setPhoneNumber(e.target.value)}
-                            required
-                          />
-                        </div>
-                        <Button
-                          onClick={handleSendOtp}
-                          className="w-full bg-[#fa6724] hover:bg-[#e55613]"
-                          disabled={isLoading || !phoneNumber}
-                        >
-                          {isLoading ? "Sending..." : "Send OTP"}
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        <div>
-                          <Label className="block text-center mb-4">
-                            Enter the verification code sent to {phoneNumber}
-                          </Label>
-                          <div className="flex justify-center gap-2">
-                            {otp.map((digit, index) => (
-                              <Input
-                                key={index}
-                                id={`otp-${index}`}
-                                type="text"
-                                inputMode="numeric"
-                                maxLength={1}
-                                value={digit}
-                                onChange={(e) => handleOtpChange(index, e.target.value)}
-                                className="w-12 h-12 text-center text-xl"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <Button
-                          onClick={handleVerifyOtp}
-                          className="w-full bg-[#fa6724] hover:bg-[#e55613]"
-                          disabled={isLoading || otp.some((digit) => !digit)}
-                        >
-                          {isLoading ? "Verifying..." : "Verify OTP"}
-                        </Button>
-                        <p className="text-center text-sm">
-                          Didn't receive the code?{" "}
-                          <button type="button" className="text-[#07a6ec] hover:underline" onClick={handleSendOtp}>
-                            Resend
-                          </button>
+                            Download here
+                          </a>
                         </p>
                       </div>
                     )}
-                  </TabsContent>
+                  </div>
+                </div>
 
-                  <TabsContent value="biometric">
-                    <div className="space-y-6 text-center">
-                      <div className="mx-auto w-32 h-32 rounded-full bg-white flex items-center justify-center">
-                        <Image
-                          src="https://i.ibb.co/8nHxb4zN/claimsaathi-snapping-winking.png"
-                          alt="Claim Saathi"
-                          width={120}
-                          height={120}
-                          className="rounded-full"
-                        />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-medium mb-2">Biometric Authentication</h3>
-                        <p className="text-gray-600 dark:text-gray-400 mb-4">
-                          Use your fingerprint or face ID to securely log in to your account
-                        </p>
-                        <Button
-                          onClick={handleBiometricLogin}
-                          className="bg-[#fa6724] hover:bg-[#e55613]"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? "Authenticating..." : "Authenticate"}
-                        </Button>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <div className="mt-8 text-center">
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Don't have an account?{" "}
-                    <Link href="/auth/register" className="text-[#07a6ec] hover:underline">
-                      Sign up
-                    </Link>
-                  </p>
+                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+                    <p className="mb-2">🔐 Powered by Aptos blockchain</p>
+                    <p>✅ No passwords • ✅ Secure • ✅ Decentralized</p>
+                  </div>
                 </div>
               </div>
             )}
