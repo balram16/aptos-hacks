@@ -47,12 +47,12 @@ export default function DashboardHeader() {
           <Link href="/dashboard" className="flex items-center gap-2">
             <Image 
               src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
-              alt="Swift Claim Logo"
+              alt="ChainSure Logo"
               width={32}
               height={32}
               className="rounded-lg"
             />
-            <span className="font-bold text-xl hidden md:inline-block">Swift Claim</span>
+            <span className="font-bold text-xl hidden md:inline-block">ChainSure</span>
           </Link>
         </div>
 

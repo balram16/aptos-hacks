@@ -164,13 +164,13 @@ export default function ProviderLayout({ children }: ProviderLayoutProps) {
           <div className="flex items-center gap-3 mb-8">
             <Image
               src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
-              alt="Swift Claim"
+              alt="ChainSure"
               width={40}
               height={40}
               className="rounded-lg"
             />
             <div>
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white">Swift Claim</h2>
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white">ChainSure</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">Provider Portal</p>
             </div>
           </div>

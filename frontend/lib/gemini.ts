@@ -12,7 +12,7 @@ export async function generateChatResponse(messages: any[]) {
     "I can help you file a new claim! Just provide some basic details about the incident and upload any relevant documentation.",
     "Our blockchain verification ensures that all your data is securely stored and every step of the verification process is transparent.",
     "The smart contract automatically checks your policy coverage and triggers payment when the claim is verified.",
-    "Swift Claim uses blockchain to create an immutable record of your claim, preventing fraud and ensuring transparency.",
+    "ChainSure uses blockchain to create an immutable record of your claim, preventing fraud and ensuring transparency.",
     "Your claim is being processed through our secure blockchain network. You'll receive updates in real-time as it progresses.",
   ]
 
@@ -27,7 +27,7 @@ export async function generateChatResponse(messages: any[]) {
 }
 
 export async function getSystemPrompt() {
-  return `You are Claim Saathi, an AI assistant for Swift Claim - a blockchain-powered insurance claims platform.
+  return `You are Claim Saathi, an AI assistant for ChainSure - a blockchain-powered insurance claims platform.
 
 Your primary goals are to:
 1. Help users understand how to file and track insurance claims

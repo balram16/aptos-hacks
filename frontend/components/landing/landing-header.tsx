@@ -17,12 +17,12 @@ export default function LandingHeader() {
           <Link href="/" className="flex items-center gap-2">
             <Image 
               src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
-              alt="Swift Claim Logo"
+              alt="ChainSure Logo"
               width={40}
               height={40}
               className="rounded-lg"
             />
-            <span className="font-bold text-xl">Swift Claim</span>
+            <span className="font-bold text-xl">ChainSure</span>
           </Link>
         </div>
 

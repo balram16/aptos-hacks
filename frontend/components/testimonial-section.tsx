@@ -8,7 +8,7 @@ export default function TestimonialSection() {
       role: "Health Insurance Policyholder",
       image: "/placeholder.svg?height=100&width=100",
       content:
-        "Swift Claim processed my health insurance claim in just 2 hours! The blockchain verification gave me confidence that everything was secure and transparent.",
+        "ChainSure processed my health insurance claim in just 2 hours! The blockchain verification gave me confidence that everything was secure and transparent.",
       rating: 5,
     },
     {
@@ -16,7 +16,7 @@ export default function TestimonialSection() {
       role: "Auto Insurance Customer",
       image: "/placeholder.svg?height=100&width=100",
       content:
-        "After my car accident, I was worried about a lengthy claim process. Swift Claim's AR inspection and instant approval made everything so simple.",
+        "After my car accident, I was worried about a lengthy claim process. ChainSure's AR inspection and instant approval made everything so simple.",
       rating: 5,
     },
     {
@@ -24,7 +24,7 @@ export default function TestimonialSection() {
       role: "Insurance Company Manager",
       image: "/placeholder.svg?height=100&width=100",
       content:
-        "Implementing Swift Claim has reduced our fraud cases by 78% and cut processing costs by 45%. The blockchain integration provides unmatched security.",
+        "Implementing ChainSure has reduced our fraud cases by 78% and cut processing costs by 45%. The blockchain integration provides unmatched security.",
       rating: 5,
     },
   ]
@@ -35,7 +35,7 @@ export default function TestimonialSection() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
           <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-            Discover how Swift Claim is transforming the insurance claims experience for policyholders and companies
+            Discover how ChainSure is transforming the insurance claims experience for policyholders and companies
             alike.
           </p>
         </div>

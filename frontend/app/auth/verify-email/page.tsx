@@ -68,12 +68,12 @@ export default function VerifyEmailPage() {
         <div className="flex items-center mb-8">
           <Image 
             src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
-            alt="Swift Claim Logo"
+            alt="ChainSure Logo"
             width={40}
             height={40}
             className="rounded-lg mr-3"
           />
-          <h1 className="text-2xl font-bold">Swift Claim</h1>
+          <h1 className="text-2xl font-bold">ChainSure</h1>
         </div>
 
         {isVerified ? (

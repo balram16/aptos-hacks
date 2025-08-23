@@ -57,7 +57,7 @@ export default function Home() {
               <div className="relative h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden shadow-2xl">
                 <Image
                   src="https://images.unsplash.com/photo-1579621970795-87facc2f976d?q=80&w=2070&auto=format&fit=crop"
-                  alt="Swift Claim Dashboard"
+                  alt="ChainSure Dashboard"
                   fill
                   className="object-cover"
                   priority
@@ -97,7 +97,7 @@ export default function Home() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Revolutionary Features</h2>
             <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-              Swift Claim combines cutting-edge technology with intuitive design to transform the insurance claims
+              ChainSure combines cutting-edge technology with intuitive design to transform the insurance claims
               experience.
             </p>
           </div>
@@ -123,7 +123,7 @@ export default function Home() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Blockchain Technology</h2>
             <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-              Swift Claim leverages blockchain technology to ensure secure, transparent, and efficient insurance claim
+              ChainSure leverages blockchain technology to ensure secure, transparent, and efficient insurance claim
               processing.
             </p>
           </div>
@@ -207,7 +207,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to Transform Your Insurance Experience?</h2>
           <p className="text-xl mb-8 opacity-90">
-            Join thousands of satisfied users who have simplified their insurance claims process with Swift Claim.
+            Join thousands of satisfied users who have simplified their insurance claims process with ChainSure.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/auth/login">

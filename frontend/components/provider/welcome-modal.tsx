@@ -22,7 +22,7 @@ export function WelcomeModal() {
               className="rounded-full"
             />
           </div>
-          <h2 className="text-2xl font-bold mb-2">Welcome to Swift Claim!</h2>
+          <h2 className="text-2xl font-bold mb-2">Welcome to ChainSure!</h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             I'm Claim Saathi, your AI assistant. Let's get your insurance provider dashboard set up!
           </p>

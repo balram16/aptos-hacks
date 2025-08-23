@@ -51,7 +51,7 @@ export default function HeroSection() {
             <div className="relative h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden shadow-2xl">
               <Image
                 src="/placeholder.svg?height=500&width=600"
-                alt="Swift Claim Dashboard"
+                alt="ChainSure Dashboard"
                 fill
                 className="object-cover"
                 priority

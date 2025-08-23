@@ -495,7 +495,7 @@ export default function CompanyOnboarding() {
           <div className="bg-gradient-to-r from-[#07a6ec] to-[#fa6724] p-8 text-white">
             <h1 className="text-3xl font-bold mb-4">Insurance Company Onboarding</h1>
             <p className="text-lg opacity-90">
-              Welcome to Swift Claim! Let's set up your company account and integrate our blockchain-powered claims
+              Welcome to ChainSure! Let's set up your company account and integrate our blockchain-powered claims
               processing system.
             </p>
           </div>

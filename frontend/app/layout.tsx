@@ -10,7 +10,7 @@ import { LoadingProvider } from "@/providers/loading-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Swift Claim - AI & Blockchain Insurance Claims",
+  title: "ChainSure - AI & Blockchain Insurance Claims",
   description: "Revolutionizing insurance claims with AI & blockchain: faster, smarter, fraud-proof",
     generator: 'v0.dev'
 }

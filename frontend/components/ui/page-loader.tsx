@@ -103,7 +103,7 @@ const pageLoadingMessages = {
       icon: "🔒"
     },
     {
-      message: "Loading Swift Claim platform...",
+      message: "Loading ChainSure platform...",
       icon: "⚡"
     },
     {
@@ -143,7 +143,7 @@ export function PageLoader() {
           {/* Logo */}
           <Image
             src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
-            alt="Swift Claim"
+            alt="ChainSure"
             width={80}
             height={80}
             className="rounded-xl"

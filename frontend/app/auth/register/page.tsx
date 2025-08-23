@@ -727,7 +727,7 @@ export default function RegisterPage() {
           <div className="absolute inset-0 bg-black/20" />
           <div className="absolute inset-0 flex items-center justify-center p-12">
             <div className="max-w-md text-white">
-              <h2 className="text-3xl font-bold mb-6">Why Choose Swift Claim?</h2>
+              <h2 className="text-3xl font-bold mb-6">Why Choose ChainSure?</h2>
               <ul className="space-y-4">
                 <li className="flex items-start gap-3">
                   <div className="h-6 w-6 rounded-full bg-white text-[#fa6724] flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -769,7 +769,7 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <p className="text-sm mb-2">
-                      "Swift Claim has revolutionized how we handle insurance claims. The process is 
+                      "ChainSure has revolutionized how we handle insurance claims. The process is 
                       incredibly fast and transparent!"
                     </p>
                     <p className="text-sm font-medium">- Rahul Mehta, Happy Customer</p>

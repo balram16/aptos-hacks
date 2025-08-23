@@ -55,7 +55,7 @@ export default function LoginPage() {
       setIsTransitioning(false)
       toast({
         title: "Login successful",
-        description: "Welcome back to Swift Claim!",
+        description: "Welcome back to ChainSure!",
       })
       // Redirect based on user type
       if (userType === "user") {
@@ -74,7 +74,7 @@ export default function LoginPage() {
       setIsLoading(false)
       toast({
         title: "Biometric authentication successful",
-        description: "Welcome back to Swift Claim!",
+        description: "Welcome back to ChainSure!",
       })
       // Redirect based on user type
       if (userType === "user") {
@@ -107,7 +107,7 @@ export default function LoginPage() {
       setIsLoading(false)
       toast({
         title: "OTP verified",
-        description: "Welcome back to Swift Claim!",
+        description: "Welcome back to ChainSure!",
       })
       // Redirect based on user type
       if (userType === "user") {
@@ -131,12 +131,12 @@ export default function LoginPage() {
                 <div className="text-center mb-8">
                   <Image 
                     src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
-                    alt="Swift Claim Logo"
+                    alt="ChainSure Logo"
                     width={48}
                     height={48}
                     className="mx-auto rounded-xl mb-4"
                   />
-                  <h1 className="text-2xl font-bold mb-2">Welcome to Swift Claim</h1>
+                  <h1 className="text-2xl font-bold mb-2">Welcome to ChainSure</h1>
                   <p className="text-gray-600 dark:text-gray-400">Choose how you want to continue</p>
                 </div>
 
@@ -385,7 +385,7 @@ export default function LoginPage() {
             <div className="max-w-md text-white">
               <h2 className="text-3xl font-bold mb-4">Revolutionizing Insurance Claims</h2>
               <p className="text-lg mb-6">
-                Swift Claim reduces claim settlement time from 90 days to under 3 minutes with AI & blockchain
+                ChainSure reduces claim settlement time from 90 days to under 3 minutes with AI & blockchain
                 technology.
               </p>
               <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
@@ -401,7 +401,7 @@ export default function LoginPage() {
                   </div>
                   <div className="bg-white/20 rounded-lg p-3">
                     <p className="text-sm">
-                      "Swift Claim processed my health insurance claim in just 2 hours! The blockchain verification gave
+                      "ChainSure processed my health insurance claim in just 2 hours! The blockchain verification gave
                       me confidence that everything was secure."
                     </p>
                   </div>

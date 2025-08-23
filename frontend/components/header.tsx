@@ -19,7 +19,7 @@ export default function Header() {
                 <Zap className="h-4 w-4 text-[#fa6724]" />
               </div>
             </div>
-            <span className="font-bold text-xl">Swift Claim</span>
+            <span className="font-bold text-xl">ChainSure</span>
           </Link>
         </div>
 

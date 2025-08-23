@@ -58,7 +58,7 @@ export default function BlockchainExplainer() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Blockchain Technology</h2>
           <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-            Swift Claim leverages blockchain technology to ensure secure, transparent, and efficient insurance claim
+            ChainSure leverages blockchain technology to ensure secure, transparent, and efficient insurance claim
             processing.
           </p>
         </div>

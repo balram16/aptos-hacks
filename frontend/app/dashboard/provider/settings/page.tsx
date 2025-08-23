@@ -27,7 +27,7 @@ import {
 export default function ProviderSettingsPage() {
   // Company Profile State
   const [companyProfile, setCompanyProfile] = useState({
-    name: "Swift Claim Insurance",
+    name: "ChainSure Insurance",
     registrationNumber: "INS123456789",
     taxId: "GSTIN9876543210",
     address: "123 Business Park, Bangalore 560001",

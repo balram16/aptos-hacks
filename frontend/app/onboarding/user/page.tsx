@@ -16,7 +16,7 @@ export default function UserOnboarding() {
           <div className="bg-gradient-to-r from-[#fa6724] to-[#07a6ec] p-8 text-white">
             <h1 className="text-3xl font-bold mb-4">Policyholder Onboarding</h1>
             <p className="text-lg opacity-90">
-              Welcome to Swift Claim! Let's set up your account and get you started with our revolutionary insurance
+              Welcome to ChainSure! Let's set up your account and get you started with our revolutionary insurance
               claims platform.
             </p>
           </div>

@@ -14,7 +14,7 @@ const genAI = new GoogleGenerativeAI("AIzaSyD7Lo4tZk7V3iwZ0XsutrjZEEwYqqVBr40")
 // Global chat history array
 let chatHistory: { role: 'user' | 'chatbot'; content: string }[] = [];
 
-const SYSTEM_PROMPT = `You are Claim Saathi, an AI assistant for Swift Claim - an insurance claims processing platform.
+const SYSTEM_PROMPT = `You are Claim Saathi, an AI assistant for ChainSure - an insurance claims processing platform.
 
 Your personality:
 - Friendly and empathetic
@@ -199,7 +199,7 @@ export default function ChatbotWidget() {
           <div className="relative">
             <Image
               src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
-              alt="Swift Claim"
+              alt="ChainSure"
               width={40}
               height={40}
               className="rounded-xl"
