@@ -8,7 +8,7 @@ declare global {
 }
 
 // Contract address for devnet
-export const CONTRACT_ADDRESS = "0x7db1a4673c2c6a1c3031c16410ee916af2b3fcd809ba5b92ce920bcca202679f";
+export const CONTRACT_ADDRESS = "0x570f8be36f111c0bf48e788881303086348e2844341474cda63dc6b3a36c7e0a";
 
 // Initialize Aptos client for devnet
 const aptosConfig = new AptosConfig({ network: Network.DEVNET });
@@ -53,12 +53,15 @@ export interface BlockchainPolicy {
 }
 
 export interface BlockchainUserPolicy {
+  id: string;
   policy_id: string;
   user_address: string;
   purchase_date: string;
   expiry_date: string;
   premium_paid: string;
-  active: boolean;
+  status: number;
+  token_id: string;        // NFT token ID
+  metadata_uri: string;    // IPFS metadata URI
 }
 
 export interface PolicyNFTMetadata {
@@ -252,13 +255,15 @@ export async function purchasePolicy(
     - APT Amount (Octas): ${monthlyPremiumAPT}
     - Rate: 1 APT = ${INR_TO_APT_RATE / APT_DECIMALS} INR`);
 
-    // Send transaction - deployed contract only takes policy_id parameter
+    // Send transaction - full NFT-enabled contract with all parameters
     const transaction = {
       data: {
         function: `${CONTRACT_ADDRESS}::insurance_portal::purchase_policy`,
         typeArguments: [],
         functionArguments: [
-          numericPolicyId.toString()  // Only policy_id parameter as per deployed contract
+          numericPolicyId.toString(),
+          metadataUri,
+          monthlyPremiumAPT.toString()  // Pass APT amount in Octas
         ],
       },
     };

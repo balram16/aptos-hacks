@@ -214,7 +214,7 @@ module insurance_platform::insurance_portal {
             user_tokens: table::new(),
             payment_escrows: table::new(),
             user_escrows: table::new(),
-            admins: vector::empty(),
+            admins: vector::singleton(signer::address_of(admin)),
             policy_counter: 0,
             token_counter: 0,
             escrow_counter: 0,
@@ -226,6 +226,24 @@ module insurance_platform::insurance_portal {
             user_registered_events: account::new_event_handle<UserRegisteredEvent>(&resource_signer),
             payment_events: account::new_event_handle<PaymentEvent>(&resource_signer),
         };
+        
+        // Register the deployer as admin user
+        let admin_addr = signer::address_of(admin);
+        let admin_user = User {
+            wallet: admin_addr,
+            role: ROLE_ADMIN,
+            registered: true,
+            name: string::utf8(b"Contract Admin"),
+            location: string::utf8(b""),
+            contact: string::utf8(b""),
+            registered_at: timestamp::now_seconds(),
+        };
+        
+        table::add(&mut portal.users, admin_addr, admin_user);
+        table::add(&mut portal.user_policies, admin_addr, vector::empty<UserPolicy>());
+        table::add(&mut portal.user_tokens, admin_addr, vector::empty<String>());
+        table::add(&mut portal.user_escrows, admin_addr, vector::empty<u64>());
+        
         move_to(admin, portal);
     }
 
@@ -296,10 +314,12 @@ module insurance_platform::insurance_portal {
         let admin_addr = signer::address_of(admin);
         let portal = borrow_global_mut<InsurancePortal>(@insurance_platform);
         
-        // Check if user is admin
-        assert!(table::contains(&portal.users, admin_addr), error::not_found(E_NOT_ADMIN));
-        let user = table::borrow(&portal.users, admin_addr);
-        assert!(user.role == ROLE_ADMIN, error::permission_denied(E_NOT_ADMIN));
+        // Check if user is admin or deployer
+        if (admin_addr != @insurance_platform) {
+            assert!(table::contains(&portal.users, admin_addr), error::not_found(E_NOT_ADMIN));
+            let user = table::borrow(&portal.users, admin_addr);
+            assert!(user.role == ROLE_ADMIN, error::permission_denied(E_NOT_ADMIN));
+        };
 
         // Create policy
         portal.policy_counter = portal.policy_counter + 1;

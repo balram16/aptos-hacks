@@ -218,11 +218,11 @@ export default function UserDashboard() {
         console.log("🔍 Processing user policy:", bp)
         const policy = allPolicies.find((p) => p.policy_id === bp.policy_id);
         return {
-          id: bp.policy_id, // Use policy_id as the ID
+          id: bp.id,
           policyId: bp.policy_id,
           userWallet: bp.user_address,
           purchaseDate: new Date(parseInt(bp.purchase_date) * 1000).toISOString(),
-          status: (bp.active ? "Active" : "Expired") as "Active" | "Expired" | "Claimed" | "Cancelled",
+          status: (bp.status === 1 ? "Active" : "Expired") as "Active" | "Expired" | "Claimed" | "Cancelled",
           premiumPaid: parseInt(bp.premium_paid),
           policy: policy
             ? {

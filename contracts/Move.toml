@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = ["aptoss@chainsure.com"]
 
 [addresses]
-insurance_platform = "0xecc9ec84de9913e9b303e5aad94665abe1673830344ec13f3b36aeee3f45e845"
+insurance_platform = "0x570f8be36f111c0bf48e788881303086348e2844341474cda63dc6b3a36c7e0a"
 aptos_token_objects = "0x4"
 
 [dev-addresses]
