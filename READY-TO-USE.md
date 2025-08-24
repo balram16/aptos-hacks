@@ -2,7 +2,7 @@
 
 ## ✅ **DEPLOYMENT STATUS: LIVE ON DEVNET**
 
-**Contract Address**: `0x7db1a4673c2c6a1c3031c16410ee916af2b3fcd809ba5b92ce920bcca202679f`
+**Contract Address**: `0x4f21240e952ab01526602429046f4166c2bac8cf90510a6f6ef72e3fec52a714`
 **Network**: Aptos Devnet  
 **Style**: FarmAssure permanent wallet-role linking
 
@@ -59,7 +59,7 @@ deploy.bat   # Windows
 // In browser console after connecting Petra wallet
 await window.aptos.signAndSubmitTransaction({
   data: {
-    function: "0x7db1a4673c2c6a1c3031c16410ee916af2b3fcd809ba5b92ce920bcca202679f::insurance_portal::register_user",
+    function: "0x4f21240e952ab01526602429046f4166c2bac8cf90510a6f6ef72e3fec52a714::insurance_portal::register_user",
     functionArguments: [2] // Admin role
   }
 })
@@ -70,7 +70,7 @@ await window.aptos.signAndSubmitTransaction({
 // Different wallet, browser console
 await window.aptos.signAndSubmitTransaction({
   data: {
-    function: "0x7db1a4673c2c6a1c3031c16410ee916af2b3fcd809ba5b92ce920bcca202679f::insurance_portal::register_user", 
+    function: "0x4f21240e952ab01526602429046f4166c2bac8cf90510a6f6ef72e3fec52a714::insurance_portal::register_user", 
     functionArguments: [1] // Policyholder role
   }
 })

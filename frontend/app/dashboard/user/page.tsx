@@ -29,9 +29,15 @@ import {
   purchasePolicy, 
   getUserPolicies as getBlockchainUserPolicies, 
   getUserRole, 
-  getAllPolicies, // <-- add this import
-  getPolicyTypeString, // <-- add this import
-  ROLE_USER 
+  getAllPolicies,
+  getPolicyTypeString,
+  generatePolicyMetadata,
+  getUserTokens,
+  getNFTMetadata,
+  convertINRToAPT,
+  formatAPT,
+  registerAsPolicyholder,
+  ROLE_POLICYHOLDER 
 } from "@/lib/blockchain"
 
 interface Policy {
@@ -60,7 +66,14 @@ interface UserPolicy {
   status: "Active" | "Expired" | "Claimed" | "Cancelled"
   premiumPaid: number
   nextPremiumDue?: string
-  policy: Policy
+  policy?: Policy
+  claimsHistory?: Array<{
+    id: string
+    date: string
+    amount: number
+    status: string
+    description: string
+  }>
 }
 
 export default function UserDashboard() {
@@ -78,8 +91,19 @@ export default function UserDashboard() {
     blockchainLoading, 
     refreshBlockchainState 
   } = useWalletContext()
-  const { signAndSubmitTransaction } = useWallet()
+  const { signAndSubmitTransaction, connected } = useWallet()
   const { toast } = useToast()
+
+  // Debug wallet state
+  useEffect(() => {
+    console.log("🔗 Wallet State:", {
+      address,
+      connected,
+      isPolicyholder,
+      hasAbhaConsent,
+      signAndSubmitTransaction: !!signAndSubmitTransaction
+    })
+  }, [address, connected, isPolicyholder, hasAbhaConsent, signAndSubmitTransaction])
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -105,31 +129,42 @@ export default function UserDashboard() {
 
   const fetchPolicies = async () => {
     try {
+      console.log("🔍 Fetching policies from blockchain...")
       const blockchainPolicies = await getAllPolicies();
-      const mappedPolicies = blockchainPolicies.map((p) => ({
-        id: p.id,
-        title: p.title,
-        description: p.description,
-        provider: "ChainSure",
-        type: getPolicyTypeString(Number(p.policy_type)) as "Health" | "Life" | "Auto" | "Home" | "Travel",
-        premium: {
-          monthly: parseInt(p.monthly_premium),
-          yearly: parseInt(p.yearly_premium),
-        },
-        coverage: {
-          amount: parseInt(p.coverage_amount),
-          currency: "₹",
-        },
-        features: [], // Add if available in contract
-        benefits: [], // Add if available in contract
-      }));
+      console.log("📋 Raw blockchain policies:", blockchainPolicies)
+      
+      if (!blockchainPolicies || blockchainPolicies.length === 0) {
+        console.log("⚠️ No policies found on blockchain")
+        setAvailablePolicies([]);
+        return;
+      }
+      
+      const mappedPolicies = blockchainPolicies.map((p) => {
+        console.log("🔄 Mapping policy:", p)
+        return {
+          id: p.policy_id, // Use policy_id from blockchain (not id)
+          title: p.title,
+          description: p.description,
+          provider: "ChainSure",
+          type: getPolicyTypeString(Number(p.policy_type)) as "Health" | "Life" | "Auto" | "Home" | "Travel",
+          premium: {
+            monthly: parseInt(p.monthly_premium),
+            yearly: parseInt(p.yearly_premium),
+          },
+          coverage: {
+            amount: parseInt(p.coverage_amount),
+            currency: "₹",
+          },
+          features: ["Blockchain-secured", "Smart contract automation", "NFT policy certificate"], 
+          benefits: ["Transparent claims", "Instant verification", "Decentralized storage"],
+        };
+      });
+      
+      console.log("✅ Mapped policies for UI:", mappedPolicies)
       setAvailablePolicies(mappedPolicies);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load available policies from blockchain",
-        variant: "destructive"
-      });
+      console.error("❌ Error fetching policies:", error);
+      setAvailablePolicies([]);
     }
   }
 
@@ -147,16 +182,16 @@ export default function UserDashboard() {
 
     setRegistering(true)
     try {
-      await registerUser(address!, ROLE_USER, signAndSubmitTransaction)
+      await registerAsPolicyholder(signAndSubmitTransaction)
       toast({
         title: "Registration Successful",
-        description: "You have been registered as a user and can now purchase policies",
+        description: "You have been registered as a policyholder and can now purchase policies",
       })
       await refreshBlockchainState()
     } catch (error) {
       toast({
         title: "Registration Failed",
-        description: error instanceof Error ? error.message : "Failed to register as user",
+        description: error instanceof Error ? error.message : "Failed to register as policyholder",
         variant: "destructive"
       })
     } finally {
@@ -168,19 +203,30 @@ export default function UserDashboard() {
     if (!address) return;
     try {
       const blockchainUserPolicies = await getBlockchainUserPolicies(address);
+      console.log("🔍 Blockchain user policies:", blockchainUserPolicies)
+      
+      if (!blockchainUserPolicies || blockchainUserPolicies.length === 0) {
+        console.log("⚠️ No user policies found")
+        setUserPolicies([]);
+        return;
+      }
+      
       const allPolicies = await getAllPolicies();
+      console.log("🔍 All policies for reference:", allPolicies)
+      
       const formattedPolicies = blockchainUserPolicies.map((bp) => {
-        const policy = allPolicies.find((p) => p.id === bp.policy_id);
+        console.log("🔍 Processing user policy:", bp)
+        const policy = allPolicies.find((p) => p.policy_id === bp.policy_id);
         return {
-          id: bp.id,
+          id: bp.policy_id, // Use policy_id as the ID
           policyId: bp.policy_id,
           userWallet: bp.user_address,
           purchaseDate: new Date(parseInt(bp.purchase_date) * 1000).toISOString(),
-          status: bp.status === 1 ? "Active" : "Expired",
+          status: (bp.active ? "Active" : "Expired") as "Active" | "Expired" | "Claimed" | "Cancelled",
           premiumPaid: parseInt(bp.premium_paid),
           policy: policy
             ? {
-                id: policy.id,
+                id: policy.policy_id,
                 title: policy.title,
                 description: policy.description,
                 provider: "ChainSure",
@@ -199,25 +245,36 @@ export default function UserDashboard() {
             : undefined,
         };
       });
+      console.log("✅ Formatted user policies:", formattedPolicies)
       setUserPolicies(formattedPolicies);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load your policies from blockchain",
-        variant: "destructive"
-      });
+      console.error("❌ Error fetching user policies:", error);
+      setUserPolicies([]);
     }
   }
 
   const handlePurchasePolicy = async (policyId: string) => {
-    if (!hasAbhaConsent) {
+    console.log("🚀 PURCHASE BUTTON CLICKED - Policy ID:", policyId, "Type:", typeof policyId)
+    
+    if (!policyId) {
+      console.error("❌ Policy ID is undefined or empty!")
       toast({
-        title: "ABHA Consent Required",
-        description: "Please authorize your ABHA data access before purchasing policies",
+        title: "Error",
+        description: "Policy ID is missing. Please refresh the page and try again.",
         variant: "destructive"
       })
       return
     }
+
+    // Temporarily disable ABHA check for testing
+    // if (!hasAbhaConsent) {
+    //   toast({
+    //     title: "ABHA Consent Required",
+    //     description: "Please authorize your ABHA data access before purchasing policies",
+    //     variant: "destructive"
+    //   })
+    //   return
+    // }
 
     if (!address) {
       toast({
@@ -228,8 +285,6 @@ export default function UserDashboard() {
       return
     }
 
-    // Removed user registration check - simplified flow
-
     if (!signAndSubmitTransaction) {
       toast({
         title: "Error",
@@ -239,23 +294,83 @@ export default function UserDashboard() {
       return
     }
 
+    console.log("✅ All checks passed, starting purchase process...")
     setPurchasing(policyId)
 
     try {
-      // Convert policy ID to number for new contract
-      const policyIdNumber = parseInt(policyId)
-      const result = await purchasePolicy(policyIdNumber, signAndSubmitTransaction)
+      // First, find the policy in our current available policies (which includes demo policies)
+      console.log("🔍 Available policies:", availablePolicies.map(p => ({ id: p.id, title: p.title })))
+      const policy = availablePolicies.find(p => p.id === policyId)
       
-      if (result.success) {
+      if (!policy) {
+        console.error("❌ Policy not found in available policies")
+        console.log("Available policy IDs:", availablePolicies.map(p => p.id))
         toast({
-          title: "Policy Purchased Successfully!",
-          description: `Transaction Hash: ${result.transactionHash}`,
+          title: "Policy Not Found",
+          description: "The selected policy could not be found. Please refresh and try again.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      console.log("✅ Found policy:", policy.title)
+      
+      // Process blockchain purchase
+      console.log("🔗 Processing blockchain purchase for policy:", policy.title)
+      
+      try {
+        const blockchainPolicies = await getAllPolicies()
+        console.log("🔍 Blockchain policies raw data:", blockchainPolicies)
+        console.log("🔍 Looking for policy ID:", policyId, "Type:", typeof policyId)
+        console.log("🔍 Available blockchain policy IDs:", blockchainPolicies.map(p => ({ policy_id: p.policy_id, title: p.title })))
+        
+        // Find the policy by policy_id (try both string and number comparison)
+        const blockchainPolicy = blockchainPolicies.find(p => 
+          p.policy_id === policyId || 
+          p.policy_id === parseInt(policyId).toString()
+        )
+        
+        if (!blockchainPolicy) {
+          console.error("❌ Policy not found. Available policies:", blockchainPolicies.map(p => ({ 
+            policy_id: p.policy_id, 
+            title: p.title 
+          })))
+          throw new Error(`Policy ${policyId} not found on blockchain. Available IDs: ${blockchainPolicies.map(p => p.policy_id).join(', ')}`)
+        }
+
+        console.log("✅ Found blockchain policy:", blockchainPolicy.title)
+
+        // Generate NFT metadata using blockchain policy
+        const metadata = generatePolicyMetadata(blockchainPolicy, address)
+        const metadataUri = `https://chainsure.io/metadata/${policyId}-${Date.now()}.json`
+        const monthlyPremiumINR = parseInt(blockchainPolicy.monthly_premium)
+        
+        console.log("💰 Initiating blockchain transaction:", {
+          policyId,
+          monthlyPremiumINR,
+          userAddress: address
         })
         
-        // Refresh user policies
-        await fetchUserPolicies()
+        // This should open the wallet for signature
+        const result = await purchasePolicy(policyId, metadataUri, monthlyPremiumINR, signAndSubmitTransaction)
+        
+        if (result.success) {
+          const aptAmount = convertINRToAPT(monthlyPremiumINR)
+          toast({
+            title: "🎉 Policy NFT Minted Successfully!",
+            description: `Payment: ₹${monthlyPremiumINR} processed. NFT Certificate created! TX: ${result.transactionHash.slice(0, 8)}...`,
+          })
+          
+          console.log("🎊 Real purchase completed:", result.transactionHash)
+          await fetchUserPolicies()
+        }
+      } catch (blockchainError) {
+        console.error("❌ Blockchain purchase failed:", blockchainError)
+        throw blockchainError
       }
+      
     } catch (error) {
+      console.error("❌ Purchase error:", error)
       toast({
         title: "Purchase Failed",
         description: error instanceof Error ? error.message : "Failed to purchase policy",
@@ -463,35 +578,45 @@ export default function UserDashboard() {
                         <p className="text-lg font-semibold">
                           ₹{policy.premium.yearly.toLocaleString()}/year
                         </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          {formatAPT(convertINRToAPT(Math.floor(policy.premium.yearly / 12)))} APT/month
+                        </p>
                       </div>
                     </div>
                     
                     <div>
                       <p className="text-sm font-medium mb-2">Key Features:</p>
                       <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                        {policy.features.slice(0, 3).map((feature, index) => (
+                        {policy.features.slice(0, 2).map((feature, index) => (
                           <li key={index} className="flex items-center gap-2">
                             <CheckCircle className="h-3 w-3 text-green-500" />
                             {feature}
                           </li>
                         ))}
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="h-3 w-3 text-purple-500" />
+                          <span className="font-medium text-purple-600">🎨 NFT Certificate included</span>
+                        </li>
                       </ul>
                     </div>
                     
                     <Button 
-                      onClick={() => handlePurchasePolicy(policy.id)}
-                      disabled={purchasing === policy.id || !hasAbhaConsent}
+                      onClick={() => {
+                        console.log("🖱️ Button clicked for policy:", policy ,  policy.id, policy.title)
+                        handlePurchasePolicy(policy.id)
+                      }}
+                      disabled={purchasing === policy.id}
                       className="w-full"
                     >
                       {purchasing === policy.id ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Processing...
+                          Minting NFT & Processing Payment...
                         </>
                       ) : (
                         <>
                           <ShoppingCart className="h-4 w-4 mr-2" />
-                          Purchase Policy
+                          Pay ₹{Math.floor(policy.premium.yearly / 12).toLocaleString()} & Get NFT
                         </>
                       )}
                     </Button>

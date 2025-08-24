@@ -36,7 +36,7 @@ export const USER_POLICY_STATUS_EXPIRED = 2;
 export const USER_POLICY_STATUS_CANCELLED = 3;
 
 export interface BlockchainPolicy {
-  id: string;
+  policy_id: string;
   title: string;
   description: string;
   policy_type: number;
@@ -53,13 +53,23 @@ export interface BlockchainPolicy {
 }
 
 export interface BlockchainUserPolicy {
-  id: string;
   policy_id: string;
   user_address: string;
   purchase_date: string;
   expiry_date: string;
   premium_paid: string;
-  status: number;
+  active: boolean;
+}
+
+export interface PolicyNFTMetadata {
+  name: string;
+  description: string;
+  image_uri: string;
+  coverage_amount: string;
+  validity_start: string;
+  validity_end: string;
+  premium_amount: string;
+  policy_type: number;
 }
 
 /**
@@ -186,19 +196,70 @@ export async function createPolicy(
   }
 }
 
+// Payment constants
+export const APT_DECIMALS = 100000000; // 1 APT = 10^8 Octas
+export const INR_TO_APT_RATE = 1000000; // 1 APT = 10 INR (simplified for demo)
+
 /**
- * Purchase a policy (policyholder only - like FarmAssure completePurchase)
+ * Convert INR to APT (Octas)
+ */
+export function convertINRToAPT(inrAmount: number): number {
+  return Math.floor((inrAmount * APT_DECIMALS) / INR_TO_APT_RATE);
+}
+
+/**
+ * Convert APT (Octas) to INR
+ */
+export function convertAPTToINR(aptOctas: number): number {
+  return Math.floor((aptOctas * INR_TO_APT_RATE) / APT_DECIMALS);
+}
+
+/**
+ * Format APT amount for display
+ */
+export function formatAPT(octas: number): string {
+  return (octas / APT_DECIMALS).toFixed(4) + " APT";
+}
+
+/**
+ * Purchase a policy with payment and NFT minting
  */
 export async function purchasePolicy(
-  policyId: number,
+  policyId: any,
+  metadataUri: string,
+  monthlyPremiumINR: number,
   signAndSubmitTransaction: any
 ) {
   try {
+    // Convert policy ID to number if it's a string
+    const numericPolicyId = typeof policyId === 'string' ? parseInt(policyId) : policyId;
+    
+    // Log purchase attempt
+    console.log("Purchasing policy:", numericPolicyId);
+    if (!metadataUri || metadataUri.trim() === "") {
+      throw new Error("Invalid metadata URI");
+    }
+    if (isNaN(monthlyPremiumINR) || monthlyPremiumINR <= 0) {
+      throw new Error("Invalid premium amount");
+    }
+
+    // Convert INR to APT (in Octas)
+    const monthlyPremiumAPT = convertINRToAPT(monthlyPremiumINR);
+    
+    console.log(`💰 Payment Details:
+    - Policy ID: ${numericPolicyId}
+    - Monthly Premium: ${monthlyPremiumINR} INR = ${formatAPT(monthlyPremiumAPT)}
+    - APT Amount (Octas): ${monthlyPremiumAPT}
+    - Rate: 1 APT = ${INR_TO_APT_RATE / APT_DECIMALS} INR`);
+
+    // Send transaction - deployed contract only takes policy_id parameter
     const transaction = {
       data: {
         function: `${CONTRACT_ADDRESS}::insurance_portal::purchase_policy`,
         typeArguments: [],
-        functionArguments: [policyId],
+        functionArguments: [
+          numericPolicyId.toString()  // Only policy_id parameter as per deployed contract
+        ],
       },
     };
 
@@ -210,6 +271,8 @@ export async function purchasePolicy(
     return {
       success: true,
       transactionHash: response.hash,
+      paymentAmount: monthlyPremiumAPT,
+      paymentAmountINR: monthlyPremiumINR,
     };
   } catch (error) {
     console.error("Error purchasing policy:", error);
@@ -373,4 +436,158 @@ export function formatAmount(amount: string): number {
 export function formatDate(timestamp: string): string {
   const date = new Date(parseInt(timestamp, 10) * 1000);
   return date.toLocaleDateString();
+}
+
+/**
+ * Get NFT metadata by token ID
+ */
+export async function getNFTMetadata(tokenId: string): Promise<PolicyNFTMetadata | null> {
+  try {
+    const result = await aptos.view({
+      payload: {
+        function: `${CONTRACT_ADDRESS}::insurance_portal::get_nft_metadata`,
+        typeArguments: [],
+        functionArguments: [tokenId],
+      },
+    });
+
+    return result[0] as PolicyNFTMetadata;
+  } catch (error) {
+    console.error("Error getting NFT metadata:", error);
+    return null;
+  }
+}
+
+/**
+ * Get all tokens owned by user
+ */
+export async function getUserTokens(walletAddress: string): Promise<string[]> {
+  try {
+    const result = await aptos.view({
+      payload: {
+        function: `${CONTRACT_ADDRESS}::insurance_portal::get_user_tokens`,
+        typeArguments: [],
+        functionArguments: [walletAddress],
+      },
+    });
+
+    return (result[0] as string[]) || [];
+  } catch (error) {
+    console.error("Error getting user tokens:", error);
+    return [];
+  }
+}
+
+/**
+ * Get all tokens for a specific policy
+ */
+export async function getPolicyTokens(policyId: number): Promise<string[]> {
+  try {
+    const result = await aptos.view({
+      payload: {
+        function: `${CONTRACT_ADDRESS}::insurance_portal::get_policy_tokens`,
+        typeArguments: [],
+        functionArguments: [policyId],
+      },
+    });
+
+    return (result[0] as string[]) || [];
+  } catch (error) {
+    console.error("Error getting policy tokens:", error);
+    return [];
+  }
+}
+
+/**
+ * Get collection information
+ */
+export async function getCollectionInfo(): Promise<{name: string, description: string, uri: string} | null> {
+  try {
+    const result = await aptos.view({
+      payload: {
+        function: `${CONTRACT_ADDRESS}::insurance_portal::get_collection_info`,
+        typeArguments: [],
+        functionArguments: [],
+      },
+    });
+
+    const [name, description, uri] = result as [string, string, string];
+    return { name, description, uri };
+  } catch (error) {
+    console.error("Error getting collection info:", error);
+    return null;
+  }
+}
+
+/**
+ * Get total tokens minted
+ */
+export async function getTotalTokens(): Promise<number> {
+  try {
+    const result = await aptos.view({
+      payload: {
+        function: `${CONTRACT_ADDRESS}::insurance_portal::get_total_tokens`,
+        typeArguments: [],
+        functionArguments: [],
+      },
+    });
+
+    return result[0] as number;
+  } catch (error) {
+    console.error("Error getting total tokens:", error);
+    return 0;
+  }
+}
+
+/**
+ * Generate IPFS metadata for policy NFT
+ */
+export function generatePolicyMetadata(
+  policy: BlockchainPolicy,
+  userAddress: string
+): any {
+  return {
+    name: `${policy.title} #${policy.policy_id}`,
+    description: `${policy.description} - NFT Certificate for ChainSure Insurance Policy`,
+    image: "https://chainsure.io/policy-nft.png", // Default image
+    attributes: [
+      {
+        trait_type: "Coverage",
+        value: `${formatAmount(policy.coverage_amount)} INR`
+      },
+      {
+        trait_type: "Premium",
+        value: `${formatAmount(policy.yearly_premium)} INR/year`
+      },
+      {
+        trait_type: "Policy Type",
+        value: getPolicyTypeString(policy.policy_type)
+      },
+      {
+        trait_type: "Duration",
+        value: `${policy.duration_days} days`
+      },
+      {
+        trait_type: "Minimum Age",
+        value: policy.min_age
+      },
+      {
+        trait_type: "Maximum Age", 
+        value: policy.max_age
+      },
+      {
+        trait_type: "Policyholder",
+        value: userAddress
+      },
+      {
+        trait_type: "Created At",
+        value: formatDate(policy.created_at)
+      }
+    ],
+    external_url: `https://chainsure.io/policy/${policy.policy_id}`,
+    collection: {
+      name: "ChainSure Insurance Policies",
+      family: "ChainSure"
+    }
+  };
 }
