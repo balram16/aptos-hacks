@@ -1,5 +1,12 @@
 ---
 profiles:
+  claim-contract:
+    network: Devnet
+    private_key: ed25519-priv-0xe3d09f64cccf8eb146c9f77537df1c40859a2d0367d091a48c69c28c01cb394a
+    public_key: ed25519-pub-0x610997ba00dfc784f6f90ac76d25e2699367a1161dfb69bccc6f67bfa03b3520
+    account: 3c460abe9c8906f2d81b87c4d82aaaeea988733f9f10597beda9f2143c8336bc
+    rest_url: "https://fullnode.devnet.aptoslabs.com"
+    faucet_url: "https://faucet.devnet.aptoslabs.com"
   nft-contract:
     network: Devnet
     private_key: ed25519-priv-0xe915da99c69ee987a0a494539c48003a26cb5ce3b25bc8e3596191963723d8dd

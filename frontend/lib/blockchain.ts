@@ -64,6 +64,17 @@ export interface BlockchainUserPolicy {
   metadata_uri: string;    // IPFS metadata URI
 }
 
+export interface PolicyClaim {
+  claim_id: string;
+  policy_id: string;
+  user_address: string;
+  claim_amount: string;
+  aggregate_score: number;
+  status: number; // 1=APPROVED, 2=PENDING, 3=REJECTED
+  claimed_at: string;
+  processed_at: string;
+}
+
 export interface PolicyNFTMetadata {
   name: string;
   description: string;
@@ -595,4 +606,172 @@ export function generatePolicyMetadata(
       family: "ChainSure"
     }
   };
+}
+
+// Claim policy function
+export async function claimPolicy(
+  policyId: any,
+  aggregateScore: number,
+  signAndSubmitTransaction: any
+): Promise<{ success: boolean; transactionHash: string; claimAmount: number }> {
+  try {
+    const numericPolicyId = parseInt(policyId);
+    if (isNaN(numericPolicyId) || numericPolicyId <= 0) {
+      throw new Error('Invalid policy ID');
+    }
+
+    console.log(`📋 Claiming policy:
+    - Policy ID: ${numericPolicyId}
+    - Aggregate Score: ${aggregateScore}
+    - Expected Status: ${aggregateScore <= 30 ? 'APPROVED' : aggregateScore <= 70 ? 'PENDING' : 'REJECTED'}`);
+
+    const transaction = {
+      data: {
+        function: `${CONTRACT_ADDRESS}::insurance_portal::claim_policy`,
+        typeArguments: [],
+        functionArguments: [
+          numericPolicyId.toString(),
+          aggregateScore.toString()
+        ],
+      },
+    };
+
+    const response = await signAndSubmitTransaction(transaction);
+    await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    });
+
+    // Get policy details for claim amount
+    const policy = await getPolicy(numericPolicyId);
+    const claimAmount = policy ? parseInt(policy.coverage_amount) : 0;
+
+    return {
+      success: true,
+      transactionHash: response.hash,
+      claimAmount
+    };
+  } catch (error) {
+    console.error("Error claiming policy:", error);
+    throw error;
+  }
+}
+
+// Get user claims
+export async function getUserClaims(userAddress: string): Promise<PolicyClaim[]> {
+  try {
+    const response = await aptos.view({
+      function: `${CONTRACT_ADDRESS}::insurance_portal::get_user_claims`,
+      arguments: [userAddress],
+    });
+
+    return (response[0] as any[]).map((claim: any) => ({
+      claim_id: claim.claim_id.toString(),
+      policy_id: claim.policy_id.toString(),
+      user_address: claim.user_address,
+      claim_amount: claim.claim_amount.toString(),
+      aggregate_score: parseInt(claim.aggregate_score),
+      status: parseInt(claim.status),
+      claimed_at: claim.claimed_at.toString(),
+      processed_at: claim.processed_at.toString(),
+    }));
+  } catch (error) {
+    console.error("Error fetching user claims:", error);
+    return [];
+  }
+}
+
+// Get all claims (admin only)
+export async function getAllClaims(): Promise<PolicyClaim[]> {
+  try {
+    const response = await aptos.view({
+      function: `${CONTRACT_ADDRESS}::insurance_portal::get_all_claims`,
+      arguments: [],
+    });
+
+    return (response[0] as any[]).map((claim: any) => ({
+      claim_id: claim.claim_id.toString(),
+      policy_id: claim.policy_id.toString(),
+      user_address: claim.user_address,
+      claim_amount: claim.claim_amount.toString(),
+      aggregate_score: parseInt(claim.aggregate_score),
+      status: parseInt(claim.status),
+      claimed_at: claim.claimed_at.toString(),
+      processed_at: claim.processed_at.toString(),
+    }));
+  } catch (error) {
+    console.error("Error fetching all claims:", error);
+    return [];
+  }
+}
+
+// Get claim status
+export async function getClaimStatus(claimId: number): Promise<{ status: number; amount: string; score: number } | null> {
+  try {
+    const response = await aptos.view({
+      function: `${CONTRACT_ADDRESS}::insurance_portal::get_claim_status`,
+      arguments: [claimId.toString()],
+    });
+
+    const [status, amount, score] = response as [number, string, number];
+    return {
+      status,
+      amount: amount.toString(),
+      score
+    };
+  } catch (error) {
+    console.error("Error fetching claim status:", error);
+    return null;
+  }
+}
+
+// Approve claim (admin only)
+export async function approveClaim(
+  claimId: number,
+  signAndSubmitTransaction: any
+): Promise<{ success: boolean; transactionHash: string }> {
+  try {
+    console.log(`✅ Approving claim ID: ${claimId}`);
+
+    const transaction = {
+      data: {
+        function: `${CONTRACT_ADDRESS}::insurance_portal::approve_claim`,
+        typeArguments: [],
+        functionArguments: [
+          claimId.toString()
+        ],
+      },
+    };
+
+    const response = await signAndSubmitTransaction(transaction);
+    await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    });
+
+    return {
+      success: true,
+      transactionHash: response.hash
+    };
+  } catch (error) {
+    console.error("Error approving claim:", error);
+    throw error;
+  }
+}
+
+// Utility functions for claim status
+export function getClaimStatusString(status: number): string {
+  switch (status) {
+    case 1: return 'Approved';
+    case 2: return 'Pending Verification';
+    case 3: return 'Rejected';
+    default: return 'Unknown';
+  }
+}
+
+export function getClaimStatusColor(status: number): string {
+  switch (status) {
+    case 1: return 'text-green-600 bg-green-50';
+    case 2: return 'text-yellow-600 bg-yellow-50';
+    case 3: return 'text-red-600 bg-red-50';
+    default: return 'text-gray-600 bg-gray-50';
+  }
 }
