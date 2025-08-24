@@ -18,7 +18,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
       autoConnect={true}
       optInWallets={["Petra"]}
       dappConfig={{
-        network: Network.TESTNET, // Use MAINNET for production
+        network: Network.DEVNET, // Back to devnet for production
         mizuwallet: {
           manifestURL: "https://assets.mz.xyz/static/config/mizuwallet-connect-manifest.json"
         }

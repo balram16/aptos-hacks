@@ -1,0 +1,17 @@
+[package]
+name = "insurance_platform"
+version = "1.0.0"
+authors = ["aptoss@chainsure.com"]
+
+[addresses]
+insurance_platform = "0x7db1a4673c2c6a1c3031c16410ee916af2b3fcd809ba5b92ce920bcca202679f"
+
+[dev-addresses]
+insurance_platform = "0x42"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]

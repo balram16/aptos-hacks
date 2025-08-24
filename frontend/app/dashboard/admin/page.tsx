@@ -33,6 +33,16 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { useWalletContext } from "@/context/wallet-context"
 import DashboardHeader from "@/components/dashboard/dashboard-header"
+import { StateRestorationNotice } from "@/components/ui/state-restoration-notice"
+import { useWallet } from "@aptos-labs/wallet-adapter-react"
+import { 
+  createPolicy, 
+  getUserRole, 
+  getPolicyTypeNumber,
+  getAllPolicies,
+  getPolicyTypeString, // <-- add this import
+  ROLE_ADMIN 
+} from "@/lib/blockchain"
 
 interface Policy {
   id: string
@@ -77,8 +87,15 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [initializing, setInitializing] = useState(false)
   
-  const { address } = useWalletContext()
+  const { 
+    address, 
+    isAdmin, 
+    blockchainLoading, 
+    refreshBlockchainState 
+  } = useWalletContext()
+  const { signAndSubmitTransaction } = useWallet()
   const { toast } = useToast()
 
   const [formData, setFormData] = useState<PolicyFormData>({
@@ -120,22 +137,40 @@ export default function AdminDashboard() {
     }
   }
 
+  // These functions are now handled by wallet context
+  // Remove the individual state management functions
+
   const fetchPolicies = async () => {
     try {
-      const response = await fetch("/api/policies")
-      const data = await response.json()
-      
-      if (data.success) {
-        setPolicies(data.data.filter((p: Policy) => p.createdBy === address))
-      } else {
-        throw new Error(data.error)
-      }
+      const blockchainPolicies = await getAllPolicies();
+      // Map blockchain policies to the Policy type used in the dashboard
+      const mappedPolicies = blockchainPolicies.map((p) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        provider: "ChainSure",
+        type: getPolicyTypeString(Number(p.policy_type)) as "Health" | "Life" | "Auto" | "Home" | "Travel",
+        premium: {
+          monthly: parseInt(p.monthly_premium),
+          yearly: parseInt(p.yearly_premium),
+        },
+        coverage: {
+          amount: parseInt(p.coverage_amount),
+          currency: "₹",
+        },
+        features: [], // Add if available in contract
+        benefits: [], // Add if available in contract
+        isActive: p.status === 1,
+        createdAt: p.created_at,
+        createdBy: p.created_by,
+      }));
+      setPolicies(mappedPolicies);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to load policies",
+        description: "Failed to load policies from blockchain",
         variant: "destructive"
-      })
+      });
     }
   }
 
@@ -198,41 +233,51 @@ export default function AdminDashboard() {
       return
     }
 
+    if (!signAndSubmitTransaction) {
+      toast({
+        title: "Error",
+        description: "Please connect your wallet first",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!isAdmin) {
+      toast({
+        title: "Permission Denied",
+        description: "Only admins can create policies",
+        variant: "destructive"
+      })
+      return
+    }
+
     setCreating(true)
 
     try {
-      const response = await fetch("/api/policies/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...formData,
-          monthlyPremium: parseInt(formData.monthlyPremium) || Math.round(parseInt(formData.yearlyPremium) / 12),
-          yearlyPremium: parseInt(formData.yearlyPremium),
-          coverageAmount: parseInt(formData.coverageAmount),
-          minAge: parseInt(formData.minAge),
-          maxAge: parseInt(formData.maxAge),
-          features: formData.features.filter(f => f.trim()),
-          benefits: formData.benefits.filter(b => b.trim()),
-          requirements: formData.requirements.filter(r => r.trim()),
-          adminWallet: address
-        }),
-      })
+      const policyData = {
+        title: formData.title,
+        description: formData.description,
+        policyType: getPolicyTypeNumber(formData.type),
+        monthlyPremium: parseInt(formData.monthlyPremium) || Math.round(parseInt(formData.yearlyPremium) / 12),
+        yearlyPremium: parseInt(formData.yearlyPremium),
+        coverageAmount: parseInt(formData.coverageAmount),
+        minAge: parseInt(formData.minAge),
+        maxAge: parseInt(formData.maxAge),
+        durationDays: 365, // Default to 1 year
+        waitingPeriodDays: 30, // Default waiting period
+      }
+
+      const result = await createPolicy(policyData, signAndSubmitTransaction)
       
-      const data = await response.json()
-      
-      if (data.success) {
+      if (result.success) {
         toast({
           title: "Policy Created Successfully!",
-          description: `Transaction ID: ${data.data.transactionId}`,
+          description: `Transaction Hash: ${result.transactionHash}`,
         })
         
         resetForm()
         setShowCreateForm(false)
         await fetchPolicies()
-      } else {
-        throw new Error(data.error)
       }
     } catch (error) {
       toast({
@@ -252,10 +297,10 @@ export default function AdminDashboard() {
       setLoading(false)
     }
     
-    if (address) {
+    if (address && !blockchainLoading) {
       loadData()
     }
-  }, [address])
+  }, [address, blockchainLoading])
 
   if (loading) {
     return (
@@ -276,12 +321,55 @@ export default function AdminDashboard() {
       <DashboardHeader />
       
       <div className="container mx-auto p-6">
+        <StateRestorationNotice />
+        
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400">
             Create and manage insurance policies on the blockchain
           </p>
+          
+          {/* Platform Status */}
+          <div className="mt-4 flex flex-wrap gap-2 items-center">
+            <Badge variant={isAdmin ? "default" : "destructive"}>
+              {isAdmin ? "Admin Verified" : "Not Admin"}
+            </Badge>
+            {blockchainLoading && (
+              <Badge variant="outline" className="animate-pulse">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Syncing...
+              </Badge>
+            )}
+            <Button
+              onClick={refreshBlockchainState}
+              disabled={blockchainLoading}
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+            >
+              🔄 Refresh
+            </Button>
+          </div>
+
+          {/* Not Admin Warning */}
+          {!isAdmin && (
+            <Card className="mt-4 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/10">
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <Shield className="h-5 w-5 text-red-600 mr-3" />
+                  <div>
+                    <h3 className="font-semibold text-red-800 dark:text-red-200">
+                      Admin Access Required
+                    </h3>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      You need admin privileges to access this dashboard. Please register as an admin or contact the platform administrator.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Stats Cards */}
@@ -352,6 +440,7 @@ export default function AdminDashboard() {
               <Button 
                 onClick={() => setShowCreateForm(true)}
                 className="bg-[#fa6724] hover:bg-[#e55613]"
+                disabled={!isAdmin}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create New Policy
@@ -372,6 +461,7 @@ export default function AdminDashboard() {
                       tabsTrigger?.click()
                     }}
                     className="bg-[#fa6724] hover:bg-[#e55613]"
+                    disabled={!isAdmin}
                   >
                     Create First Policy
                   </Button>

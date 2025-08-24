@@ -23,6 +23,16 @@ import {
 import { useToast } from "@/components/ui/use-toast"
 import { useWalletContext } from "@/context/wallet-context"
 import DashboardHeader from "@/components/dashboard/dashboard-header"
+import { StateRestorationNotice } from "@/components/ui/state-restoration-notice"
+import { useWallet } from "@aptos-labs/wallet-adapter-react"
+import { 
+  purchasePolicy, 
+  getUserPolicies as getBlockchainUserPolicies, 
+  getUserRole, 
+  getAllPolicies, // <-- add this import
+  getPolicyTypeString, // <-- add this import
+  ROLE_USER 
+} from "@/lib/blockchain"
 
 interface Policy {
   id: string
@@ -58,8 +68,17 @@ export default function UserDashboard() {
   const [userPolicies, setUserPolicies] = useState<UserPolicy[]>([])
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState<string | null>(null)
+  const [registering, setRegistering] = useState(false)
   
-  const { address, hasAbhaConsent } = useWalletContext()
+  const { 
+    address, 
+    isPolicyholder, 
+    isRegistered, 
+    hasAbhaConsent, 
+    blockchainLoading, 
+    refreshBlockchainState 
+  } = useWalletContext()
+  const { signAndSubmitTransaction } = useWallet()
   const { toast } = useToast()
 
   const getTypeIcon = (type: string) => {
@@ -86,47 +105,107 @@ export default function UserDashboard() {
 
   const fetchPolicies = async () => {
     try {
-      const response = await fetch("/api/policies")
-      const data = await response.json()
-      
-      if (data.success) {
-        setAvailablePolicies(data.data)
-      } else {
-        throw new Error(data.error)
-      }
+      const blockchainPolicies = await getAllPolicies();
+      const mappedPolicies = blockchainPolicies.map((p) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        provider: "ChainSure",
+        type: getPolicyTypeString(Number(p.policy_type)) as "Health" | "Life" | "Auto" | "Home" | "Travel",
+        premium: {
+          monthly: parseInt(p.monthly_premium),
+          yearly: parseInt(p.yearly_premium),
+        },
+        coverage: {
+          amount: parseInt(p.coverage_amount),
+          currency: "₹",
+        },
+        features: [], // Add if available in contract
+        benefits: [], // Add if available in contract
+      }));
+      setAvailablePolicies(mappedPolicies);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to load available policies",
+        description: "Failed to load available policies from blockchain",
+        variant: "destructive"
+      });
+    }
+  }
+
+  // User status is now managed by wallet context
+
+  const handleRegisterUser = async () => {
+    if (!signAndSubmitTransaction) {
+      toast({
+        title: "Error",
+        description: "Please connect your wallet first",
         variant: "destructive"
       })
+      return
+    }
+
+    setRegistering(true)
+    try {
+      await registerUser(address!, ROLE_USER, signAndSubmitTransaction)
+      toast({
+        title: "Registration Successful",
+        description: "You have been registered as a user and can now purchase policies",
+      })
+      await refreshBlockchainState()
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "Failed to register as user",
+        variant: "destructive"
+      })
+    } finally {
+      setRegistering(false)
     }
   }
 
   const fetchUserPolicies = async () => {
-    if (!address) return
-
+    if (!address) return;
     try {
-      const response = await fetch("/api/policies/user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ walletAddress: address }),
-      })
-      const data = await response.json()
-      
-      if (data.success) {
-        setUserPolicies(data.data)
-      } else {
-        throw new Error(data.error)
-      }
+      const blockchainUserPolicies = await getBlockchainUserPolicies(address);
+      const allPolicies = await getAllPolicies();
+      const formattedPolicies = blockchainUserPolicies.map((bp) => {
+        const policy = allPolicies.find((p) => p.id === bp.policy_id);
+        return {
+          id: bp.id,
+          policyId: bp.policy_id,
+          userWallet: bp.user_address,
+          purchaseDate: new Date(parseInt(bp.purchase_date) * 1000).toISOString(),
+          status: bp.status === 1 ? "Active" : "Expired",
+          premiumPaid: parseInt(bp.premium_paid),
+          policy: policy
+            ? {
+                id: policy.id,
+                title: policy.title,
+                description: policy.description,
+                provider: "ChainSure",
+                type: getPolicyTypeString(Number(policy.policy_type)) as "Health" | "Life" | "Auto" | "Home" | "Travel",
+                premium: {
+                  monthly: parseInt(policy.monthly_premium),
+                  yearly: parseInt(policy.yearly_premium),
+                },
+                coverage: {
+                  amount: parseInt(policy.coverage_amount),
+                  currency: "₹",
+                },
+                features: [],
+                benefits: [],
+              }
+            : undefined,
+        };
+      });
+      setUserPolicies(formattedPolicies);
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to load your policies",
+        description: "Failed to load your policies from blockchain",
         variant: "destructive"
-      })
+      });
     }
   }
 
@@ -149,42 +228,32 @@ export default function UserDashboard() {
       return
     }
 
+    // Removed user registration check - simplified flow
+
+    if (!signAndSubmitTransaction) {
+      toast({
+        title: "Error",
+        description: "Please ensure your wallet is properly connected",
+        variant: "destructive"
+      })
+      return
+    }
+
     setPurchasing(policyId)
 
     try {
-      // Get ABHA ID from localStorage (this would be from the consent flow)
-      const storedAbhaData = localStorage.getItem("chainsure-abha-data")
-      let abhaId = "12-3456-7890-1234" // Default for demo
-
-      if (storedAbhaData) {
-        const data = JSON.parse(storedAbhaData)
-        abhaId = data.abhaId
-      }
-
-      const response = await fetch("/api/policies/purchase", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          policyId, 
-          walletAddress: address,
-          abhaId 
-        }),
-      })
+      // Convert policy ID to number for new contract
+      const policyIdNumber = parseInt(policyId)
+      const result = await purchasePolicy(policyIdNumber, signAndSubmitTransaction)
       
-      const data = await response.json()
-      
-      if (data.success) {
+      if (result.success) {
         toast({
           title: "Policy Purchased Successfully!",
-          description: `Transaction ID: ${data.data.transactionId}`,
+          description: `Transaction Hash: ${result.transactionHash}`,
         })
         
         // Refresh user policies
         await fetchUserPolicies()
-      } else {
-        throw new Error(data.error)
       }
     } catch (error) {
       toast({
@@ -204,8 +273,10 @@ export default function UserDashboard() {
       setLoading(false)
     }
     
-    loadData()
-  }, [address])
+    if (address && !blockchainLoading) {
+      loadData()
+    }
+  }, [address, blockchainLoading])
 
   if (loading) {
     return (
@@ -226,12 +297,76 @@ export default function UserDashboard() {
       <DashboardHeader />
       
       <div className="container mx-auto p-6">
+        <StateRestorationNotice />
+        
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Welcome to Your Policy Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400">
             Manage your insurance policies and explore new coverage options
           </p>
+          
+          {/* User Status */}
+          <div className="mt-4 flex flex-wrap gap-2 items-center">
+            <Badge variant={isPolicyholder ? "default" : "destructive"}>
+              {isPolicyholder ? "Policyholder Registered" : "Not Registered"}
+            </Badge>
+            <Badge variant={hasAbhaConsent ? "default" : "secondary"}>
+              {hasAbhaConsent ? "ABHA Authorized" : "ABHA Not Authorized"}
+            </Badge>
+            {blockchainLoading && (
+              <Badge variant="outline" className="animate-pulse">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Syncing...
+              </Badge>
+            )}
+            <Button
+              onClick={refreshBlockchainState}
+              disabled={blockchainLoading}
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+            >
+              🔄 Refresh
+            </Button>
+          </div>
+
+          {/* Registration status - FarmAssure style */}
+          {!isRegistered && (
+            <Card className="mt-4 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/10">
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <User className="h-5 w-5 text-orange-600 mr-3" />
+                  <div>
+                    <h3 className="font-semibold text-orange-800 dark:text-orange-200">
+                      Registration Required
+                    </h3>
+                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                      Please register as a policyholder to purchase insurance policies.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {isPolicyholder && (
+            <Card className="mt-4 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10">
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <User className="h-5 w-5 text-green-600 mr-3" />
+                  <div>
+                    <h3 className="font-semibold text-green-800 dark:text-green-200">
+                      Ready to Purchase Policies
+                    </h3>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      You're registered as a policyholder. Browse and purchase insurance policies!
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Stats Cards */}
@@ -345,7 +480,7 @@ export default function UserDashboard() {
                     
                     <Button 
                       onClick={() => handlePurchasePolicy(policy.id)}
-                      disabled={purchasing === policy.id}
+                      disabled={purchasing === policy.id || !hasAbhaConsent}
                       className="w-full"
                     >
                       {purchasing === policy.id ? (

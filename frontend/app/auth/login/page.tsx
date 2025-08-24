@@ -7,51 +7,68 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Wallet } from "lucide-react"
+import { ArrowLeft, Wallet, Shield, UserCheck } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Loader } from "@/components/ui/loader"
 import { WalletButton } from "@/components/wallet/wallet-button"
 import { useWalletContext } from "@/context/wallet-context"
+import { useWallet } from "@aptos-labs/wallet-adapter-react"
 import { AbhaConsentModal } from "@/components/abha/abha-consent-modal"
+import { registerAsAdmin, registerAsPolicyholder } from "@/lib/blockchain"
 
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { isConnected, userType, setUserType, hasAbhaConsent } = useWalletContext()
+  const { signAndSubmitTransaction } = useWallet()
+  const { 
+    isConnected, 
+    userType, 
+    setUserType, 
+    hasAbhaConsent,
+    isAdmin,
+    isPolicyholder,
+    isRegistered,
+    blockchainLoading,
+    refreshBlockchainState
+  } = useWalletContext()
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [showAbhaModal, setShowAbhaModal] = useState(false)
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [showRoleSelection, setShowRoleSelection] = useState(false)
 
-  // Handle wallet connection success
+  // Handle post-wallet connection logic
   useEffect(() => {
-    if (isConnected && userType) {
-      // For users, check ABHA consent before redirecting
-      if (userType === "user" && !hasAbhaConsent) {
-        setShowAbhaModal(true)
-        return
-      }
-      
-      // For admin or user with ABHA consent, proceed to dashboard
-      setIsTransitioning(true)
-      
-      setTimeout(() => {
-        setIsTransitioning(false)
-        toast({
-          title: "Login Successful",
-          description: "Welcome to ChainSure!",
-        })
-        
-        // Redirect based on user type
-        if (userType === "user") {
-          router.push("/dashboard/user")
-        } else {
-          router.push("/dashboard/admin")
+    if (isConnected && !blockchainLoading) {
+      if (isRegistered) {
+        // User is already registered, check ABHA for policyholders
+        if (isPolicyholder && !hasAbhaConsent) {
+          setShowAbhaModal(true)
+          return
         }
-      }, 1500)
+        
+        // Proceed to dashboard
+        setIsTransitioning(true)
+        setTimeout(() => {
+          setIsTransitioning(false)
+          toast({
+            title: "Welcome Back!",
+            description: "Auto-login successful!",
+          })
+          
+          if (isAdmin) {
+            router.push("/dashboard/admin")
+          } else if (isPolicyholder) {
+            router.push("/dashboard/user")
+          }
+        }, 1500)
+      } else {
+        // User not registered, show role selection
+        setShowRoleSelection(true)
+      }
     }
-  }, [isConnected, userType, hasAbhaConsent, router, toast])
+  }, [isConnected, blockchainLoading, isRegistered, isAdmin, isPolicyholder, hasAbhaConsent, router, toast])
 
   const handleAbhaConsentSuccess = () => {
-    // Close modal and proceed to user dashboard
     setShowAbhaModal(false)
     setIsTransitioning(true)
     
@@ -65,8 +82,56 @@ export default function LoginPage() {
     }, 1500)
   }
 
-  const handleUserTypeSelection = (type: "user" | "admin") => {
-    setUserType(type)
+  const handleRoleRegistration = async (role: "admin" | "policyholder") => {
+    if (!signAndSubmitTransaction) {
+      toast({
+        title: "Wallet Error",
+        description: "Please ensure your wallet is properly connected.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsRegistering(true)
+    try {
+      if (role === "admin") {
+        await registerAsAdmin(signAndSubmitTransaction)
+        setUserType("admin")
+        toast({
+          title: "Registration Successful!",
+          description: "Welcome Admin! You can now create policies.",
+        })
+      } else {
+        await registerAsPolicyholder(signAndSubmitTransaction)
+        setUserType("user")
+        toast({
+          title: "Registration Successful!",
+          description: "Welcome Policyholder! You can now purchase policies.",
+        })
+      }
+      
+      // Refresh blockchain state and redirect
+      await refreshBlockchainState()
+      setShowRoleSelection(false)
+      
+      setTimeout(() => {
+        if (role === "admin") {
+          router.push("/dashboard/admin")
+        } else {
+          router.push("/dashboard/user")
+        }
+      }, 1000)
+      
+    } catch (error) {
+      console.error("Registration failed:", error)
+      toast({
+        title: "Registration Failed",
+        description: "Please try again. Make sure you have enough gas.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsRegistering(false)
+    }
   }
 
   return (
@@ -81,8 +146,8 @@ export default function LoginPage() {
         {/* Left side - Form */}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="w-full max-w-md">
-            {!userType ? (
-              // User Type Selection Screen
+            {!isConnected ? (
+              // Step 1: Wallet Connection
               <div className="space-y-6">
                 <div className="text-center mb-8">
                   <Image 
@@ -93,74 +158,7 @@ export default function LoginPage() {
                     className="mx-auto rounded-xl mb-4"
                   />
                   <h1 className="text-2xl font-bold mb-2" onClick={() => router.push("/")}>Welcome to ChainSure</h1>
-                  <p className="text-gray-600 dark:text-gray-400">Choose how you want to continue</p>
-                </div>
-
-                <div className="grid gap-4">
-                  <Button
-                    onClick={() => handleUserTypeSelection("user")}
-                    className="h-auto p-4 bg-gradient-to-r from-[#fa6724] to-[#fa8124]"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
-                        <Image
-                          src="https://i.ibb.co/DgLw71WX/claimsaathi-happy-tooexcited-smilingwithopenmouth.png"
-                          alt="User"
-                          width={40}
-                          height={40}
-                          className="rounded-full"
-                        />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="font-semibold">I'm a Policyholder</h3>
-                        <p className="text-sm text-white/80">File and track insurance claims</p>
-                      </div>
-                    </div>
-                  </Button>
-
-                  <Button
-                    onClick={() => handleUserTypeSelection("admin")}
-                    className="h-auto p-4 bg-gradient-to-r from-[#07a6ec] to-[#07c6ec]"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
-                        <Image
-                          src="https://i.ibb.co/XZP3h1bN/claimsaathi-neutral-firm.png"
-                          alt="Admin"
-                          width={40}
-                          height={40}
-                          className="rounded-full"
-                        />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="font-semibold">I'm an Admin</h3>
-                        <p className="text-sm text-white/80">Create and manage policies</p>
-                      </div>
-                    </div>
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              // Wallet Connection Interface
-              <div>
-                <Button
-                  variant="ghost"
-                  onClick={() => setUserType(null)}
-                  className="mb-6"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-                
-                <div className="text-center mb-8">
-                  <h1 className="text-2xl font-bold">
-                    {userType === "user" ? "Policyholder Login" : "Admin Login"}
-                  </h1>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    {userType === "user" 
-                      ? "Connect your Petra wallet to access your policy dashboard" 
-                      : "Connect your Petra wallet to access the admin panel"}
-                  </p>
+                  <p className="text-gray-600 dark:text-gray-400">Connect your Petra wallet to get started</p>
                 </div>
 
                 <div className="space-y-6 text-center">
@@ -190,20 +188,18 @@ export default function LoginPage() {
                       />
                     </div>
                     
-                    {!isConnected && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                        <p>Don't have Petra wallet? 
-                          <a 
-                            href="https://petra.app/" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-[#07a6ec] hover:underline ml-1"
-                          >
-                            Download here
-                          </a>
-                        </p>
-                      </div>
-                    )}
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                      <p>Don't have Petra wallet? 
+                        <a 
+                          href="https://petra.app/" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-[#07a6ec] hover:underline ml-1"
+                        >
+                          Download here
+                        </a>
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -214,7 +210,88 @@ export default function LoginPage() {
                   </div>
                 </div>
               </div>
-            )}
+            ) : blockchainLoading ? (
+              // Step 2: Checking Registration Status
+              <div className="space-y-6 text-center">
+                <div className="text-center mb-8">
+                  <Image 
+                    src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
+                    alt="ChainSure Logo"
+                    width={48}
+                    height={48}
+                    className="mx-auto rounded-xl mb-4"
+                  />
+                  <h1 className="text-2xl font-bold mb-2">Checking Registration</h1>
+                  <p className="text-gray-600 dark:text-gray-400">Verifying your account on the blockchain...</p>
+                </div>
+                <div className="flex items-center justify-center">
+                  <Loader />
+                </div>
+              </div>
+            ) : showRoleSelection ? (
+              // Step 3: Role Selection for New Users
+              <div className="space-y-6">
+                <div className="text-center mb-8">
+                  <Image 
+                    src="https://i.ibb.co/5Xn2hrY3/logo-white-bg.png"
+                    alt="ChainSure Logo"
+                    width={48}
+                    height={48}
+                    className="mx-auto rounded-xl mb-4"
+                  />
+                  <h1 className="text-2xl font-bold mb-2">Choose Your Role</h1>
+                  <p className="text-gray-600 dark:text-gray-400">How would you like to use ChainSure?</p>
+                </div>
+
+                <div className="grid gap-4">
+                  <Button
+                    onClick={() => handleRoleRegistration("policyholder")}
+                    disabled={isRegistering}
+                    className="h-auto p-4 bg-gradient-to-r from-[#fa6724] to-[#fa8124] disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
+                        {isRegistering ? (
+                          <Loader className="w-6 h-6" />
+                        ) : (
+                          <Shield className="w-6 h-6" />
+                        )}
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold">I'm a Policyholder</h3>
+                        <p className="text-sm text-white/80">Purchase and manage insurance policies</p>
+                      </div>
+                    </div>
+                  </Button>
+
+                  <Button
+                    onClick={() => handleRoleRegistration("admin")}
+                    disabled={isRegistering}
+                    className="h-auto p-4 bg-gradient-to-r from-[#07a6ec] to-[#07c6ec] disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
+                        {isRegistering ? (
+                          <Loader className="w-6 h-6" />
+                        ) : (
+                          <UserCheck className="w-6 h-6" />
+                        )}
+                      </div>
+                      <div className="text-left">
+                        <h3 className="font-semibold">I'm an Admin</h3>
+                        <p className="text-sm text-white/80">Create and manage insurance policies</p>
+                      </div>
+                    </div>
+                  </Button>
+                </div>
+
+                {isRegistering && (
+                  <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+                    <p>Registering on blockchain... This may take a few seconds.</p>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
 
