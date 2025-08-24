@@ -129,10 +129,13 @@ module insurance_platform::insurance_portal {
         user_tokens: Table<address, vector<String>>,        // user -> token_ids
         payment_escrows: Table<u64, PaymentEscrow>,         // escrow_id -> escrow
         user_escrows: Table<address, vector<u64>>,          // user -> escrow_ids
+        policy_claims: Table<u64, PolicyClaim>,             // claim_id -> claim
+        user_claims: Table<address, vector<u64>>,           // user -> claim_ids
         admins: vector<address>,
         policy_counter: u64,
         token_counter: u64,
         escrow_counter: u64,
+        claim_counter: u64,
         collection_info: Option<PolicyCollection>,
         signer_cap: SignerCapability,
         treasury: u64,                                      // Platform treasury in APT
@@ -141,6 +144,7 @@ module insurance_platform::insurance_portal {
         policy_created_events: EventHandle<PolicyCreatedEvent>,
         user_registered_events: EventHandle<UserRegisteredEvent>,
         payment_events: EventHandle<PaymentEvent>,
+        policy_claimed_events: EventHandle<PolicyClaimedEvent>,
     }
 
     /// Events
@@ -179,6 +183,33 @@ module insurance_platform::insurance_portal {
         timestamp: u64,
     }
 
+    /// Claim status constants
+    const CLAIM_STATUS_APPROVED: u8 = 1;
+    const CLAIM_STATUS_PENDING: u8 = 2;
+    const CLAIM_STATUS_REJECTED: u8 = 3;
+
+    /// Policy claim struct
+    struct PolicyClaim has store, copy, drop {
+        claim_id: u64,
+        policy_id: u64,
+        user_address: address,
+        claim_amount: u64,
+        aggregate_score: u8,
+        status: u8,
+        claimed_at: u64,
+        processed_at: u64,
+    }
+
+    struct PolicyClaimedEvent has drop, store {
+        claim_id: u64,
+        policy_id: u64,
+        user: address,
+        claim_amount: u64,
+        aggregate_score: u8,
+        status: u8,
+        timestamp: u64,
+    }
+
     /// Initialize the portal (called once)
     fun init_module(admin: &signer) {
         // Create resource account for NFT minting
@@ -214,10 +245,13 @@ module insurance_platform::insurance_portal {
             user_tokens: table::new(),
             payment_escrows: table::new(),
             user_escrows: table::new(),
+            policy_claims: table::new(),
+            user_claims: table::new(),
             admins: vector::singleton(signer::address_of(admin)),
             policy_counter: 0,
             token_counter: 0,
             escrow_counter: 0,
+            claim_counter: 0,
             collection_info: option::some(collection_info),
             signer_cap,
             treasury: 0,
@@ -225,6 +259,7 @@ module insurance_platform::insurance_portal {
             policy_created_events: account::new_event_handle<PolicyCreatedEvent>(&resource_signer),
             user_registered_events: account::new_event_handle<UserRegisteredEvent>(&resource_signer),
             payment_events: account::new_event_handle<PaymentEvent>(&resource_signer),
+            policy_claimed_events: account::new_event_handle<PolicyClaimedEvent>(&resource_signer),
         };
         
         // Register the deployer as admin user
@@ -243,6 +278,7 @@ module insurance_platform::insurance_portal {
         table::add(&mut portal.user_policies, admin_addr, vector::empty<UserPolicy>());
         table::add(&mut portal.user_tokens, admin_addr, vector::empty<String>());
         table::add(&mut portal.user_escrows, admin_addr, vector::empty<u64>());
+        table::add(&mut portal.user_claims, admin_addr, vector::empty<u64>());
         
         move_to(admin, portal);
     }
@@ -272,10 +308,11 @@ module insurance_platform::insurance_portal {
             vector::push_back(&mut portal.admins, user_addr);
         };
 
-        // Initialize user policies, tokens, and escrows vectors
+        // Initialize user policies, tokens, escrows, and claims vectors
         table::add(&mut portal.user_policies, user_addr, vector::empty<UserPolicy>());
         table::add(&mut portal.user_tokens, user_addr, vector::empty<String>());
         table::add(&mut portal.user_escrows, user_addr, vector::empty<u64>());
+        table::add(&mut portal.user_claims, user_addr, vector::empty<u64>());
 
         // Emit event
         event::emit_event(&mut portal.user_registered_events, UserRegisteredEvent {
@@ -502,6 +539,179 @@ module insurance_platform::insurance_portal {
             next_payment_due,
             timestamp: current_time,
         });
+    }
+
+    /// Policyholder only: Claim policy with fraud detection
+    public entry fun claim_policy(
+        user: &signer,
+        policy_id: u64,
+        aggregate_score: u8,
+    ) acquires InsurancePortal {
+        let user_addr = signer::address_of(user);
+        let portal = borrow_global_mut<InsurancePortal>(@insurance_platform);
+        
+        // Check if user is policyholder
+        assert!(table::contains(&portal.users, user_addr), error::not_found(E_NOT_POLICYHOLDER));
+        let user_info = table::borrow(&portal.users, user_addr);
+        assert!(user_info.role == ROLE_POLICYHOLDER, error::permission_denied(E_NOT_POLICYHOLDER));
+
+        // Check if policy exists
+        assert!(table::contains(&portal.policies, policy_id), error::not_found(E_POLICY_NOT_FOUND));
+        let policy = table::borrow(&portal.policies, policy_id);
+
+        // Check if user has this policy
+        let user_policies = table::borrow(&portal.user_policies, user_addr);
+        let has_policy = false;
+        let policy_coverage = 0u64;
+        let i = 0;
+        while (i < vector::length(user_policies)) {
+            let user_policy = vector::borrow(user_policies, i);
+            if (user_policy.policy_id == policy_id && user_policy.active) {
+                has_policy = true;
+                policy_coverage = policy.coverage_amount;
+                break
+            };
+            i = i + 1;
+        };
+        assert!(has_policy, error::not_found(E_POLICY_NOT_FOUND));
+
+        // Generate claim ID
+        portal.claim_counter = portal.claim_counter + 1;
+        let claim_id = portal.claim_counter;
+        let current_time = timestamp::now_seconds();
+
+        // Determine status based on aggregate score
+        let status = if (aggregate_score <= 30) {
+            CLAIM_STATUS_APPROVED
+        } else if (aggregate_score <= 70) {
+            CLAIM_STATUS_PENDING
+        } else {
+            CLAIM_STATUS_REJECTED
+        };
+
+        // Create claim record
+        let claim = PolicyClaim {
+            claim_id,
+            policy_id,
+            user_address: user_addr,
+            claim_amount: policy_coverage,
+            aggregate_score,
+            status,
+            claimed_at: current_time,
+            processed_at: current_time,
+        };
+
+        // Store claim
+        table::add(&mut portal.policy_claims, claim_id, claim);
+        
+        // Add to user claims
+        let user_claims = table::borrow_mut(&mut portal.user_claims, user_addr);
+        vector::push_back(user_claims, claim_id);
+
+        // If approved (score 0-30), transfer funds from admin to user
+        if (status == CLAIM_STATUS_APPROVED) {
+            // Get resource signer for transfers
+            let resource_signer = account::create_signer_with_capability(&portal.signer_cap);
+            // Transfer coverage amount from admin account to user
+            coin::transfer<AptosCoin>(&resource_signer, user_addr, policy_coverage);
+        };
+
+        // Emit event
+        event::emit_event(&mut portal.policy_claimed_events, PolicyClaimedEvent {
+            claim_id,
+            policy_id,
+            user: user_addr,
+            claim_amount: policy_coverage,
+            aggregate_score,
+            status,
+            timestamp: current_time,
+        });
+    }
+
+    /// Admin only: Approve pending claim manually
+    public entry fun approve_claim(
+        admin: &signer,
+        claim_id: u64,
+    ) acquires InsurancePortal {
+        let admin_addr = signer::address_of(admin);
+        let portal = borrow_global_mut<InsurancePortal>(@insurance_platform);
+        
+        // Check if user is admin or deployer
+        if (admin_addr != @insurance_platform) {
+            assert!(table::contains(&portal.users, admin_addr), error::not_found(E_NOT_ADMIN));
+            let user = table::borrow(&portal.users, admin_addr);
+            assert!(user.role == ROLE_ADMIN, error::permission_denied(E_NOT_ADMIN));
+        };
+
+        // Check if claim exists and is pending
+        assert!(table::contains(&portal.policy_claims, claim_id), error::not_found(E_POLICY_NOT_FOUND));
+        let claim = table::borrow_mut(&mut portal.policy_claims, claim_id);
+        assert!(claim.status == CLAIM_STATUS_PENDING, error::invalid_argument(E_INVALID_ROLE));
+
+        // Update claim status
+        claim.status = CLAIM_STATUS_APPROVED;
+        claim.processed_at = timestamp::now_seconds();
+
+        // Transfer funds from admin to user
+        let resource_signer = account::create_signer_with_capability(&portal.signer_cap);
+        coin::transfer<AptosCoin>(&resource_signer, claim.user_address, claim.claim_amount);
+
+        // Emit event
+        event::emit_event(&mut portal.policy_claimed_events, PolicyClaimedEvent {
+            claim_id,
+            policy_id: claim.policy_id,
+            user: claim.user_address,
+            claim_amount: claim.claim_amount,
+            aggregate_score: claim.aggregate_score,
+            status: CLAIM_STATUS_APPROVED,
+            timestamp: claim.processed_at,
+        });
+    }
+
+    /// Get claim status
+    #[view]
+    public fun get_claim_status(claim_id: u64): (u8, u64, u8) acquires InsurancePortal {
+        let portal = borrow_global<InsurancePortal>(@insurance_platform);
+        assert!(table::contains(&portal.policy_claims, claim_id), error::not_found(E_POLICY_NOT_FOUND));
+        let claim = table::borrow(&portal.policy_claims, claim_id);
+        (claim.status, claim.claim_amount, claim.aggregate_score)
+    }
+
+    /// Get all claims for admin
+    #[view]
+    public fun get_all_claims(): vector<PolicyClaim> acquires InsurancePortal {
+        let portal = borrow_global<InsurancePortal>(@insurance_platform);
+        let claims = vector::empty<PolicyClaim>();
+        let i = 1;
+        while (i <= portal.claim_counter) {
+            if (table::contains(&portal.policy_claims, i)) {
+                let claim = table::borrow(&portal.policy_claims, i);
+                vector::push_back(&mut claims, *claim);
+            };
+            i = i + 1;
+        };
+        claims
+    }
+
+    /// Get user claims
+    #[view]
+    public fun get_user_claims(user_address: address): vector<PolicyClaim> acquires InsurancePortal {
+        let portal = borrow_global<InsurancePortal>(@insurance_platform);
+        let claims = vector::empty<PolicyClaim>();
+        
+        if (table::contains(&portal.user_claims, user_address)) {
+            let user_claim_ids = table::borrow(&portal.user_claims, user_address);
+            let i = 0;
+            while (i < vector::length(user_claim_ids)) {
+                let claim_id = *vector::borrow(user_claim_ids, i);
+                if (table::contains(&portal.policy_claims, claim_id)) {
+                    let claim = table::borrow(&portal.policy_claims, claim_id);
+                    vector::push_back(&mut claims, *claim);
+                };
+                i = i + 1;
+            };
+        };
+        claims
     }
 
     /// Get all policies (for display)
