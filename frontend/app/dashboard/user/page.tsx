@@ -21,6 +21,7 @@ import {
   Loader2
 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { fraudDetectionAPI, getClaimStatusFromScore } from "@/lib/fraud-detection"
 import { useWalletContext } from "@/context/wallet-context"
 import DashboardHeader from "@/components/dashboard/dashboard-header"
 import { StateRestorationNotice } from "@/components/ui/state-restoration-notice"
@@ -37,7 +38,11 @@ import {
   convertINRToAPT,
   formatAPT,
   registerAsPolicyholder,
-  ROLE_POLICYHOLDER 
+  ROLE_POLICYHOLDER,
+  claimPolicy,
+  getUserClaims,
+  getClaimStatusString,
+  getClaimStatusColor
 } from "@/lib/blockchain"
 
 interface Policy {
@@ -82,6 +87,8 @@ export default function UserDashboard() {
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState<string | null>(null)
   const [registering, setRegistering] = useState(false)
+  const [claiming, setClaiming] = useState<string | null>(null)
+  const [userClaims, setUserClaims] = useState<any[]>([])
   
   const { 
     address, 
@@ -222,7 +229,24 @@ export default function UserDashboard() {
           policyId: bp.policy_id,
           userWallet: bp.user_address,
           purchaseDate: new Date(parseInt(bp.purchase_date) * 1000).toISOString(),
-          status: (bp.status === 1 ? "Active" : "Expired") as "Active" | "Expired" | "Claimed" | "Cancelled",
+          status: (() => {
+            // Check if policy is actually expired based on purchase date and duration
+            const purchaseDate = new Date(parseInt(bp.purchase_date) * 1000);
+            const policy = allPolicies.find((p) => p.policy_id === bp.policy_id);
+            if (policy) {
+              const durationDays = parseInt(policy.duration_days);
+              const expiryDate = new Date(purchaseDate.getTime() + (durationDays * 24 * 60 * 60 * 1000));
+              const now = new Date();
+              
+              if (now > expiryDate) {
+                return "Expired";
+              } else {
+                return "Active";
+              }
+            }
+            // Fallback to blockchain status if policy not found
+            return (bp.status === 1 ? "Active" : "Expired") as "Active" | "Expired" | "Claimed" | "Cancelled";
+          })(),
           premiumPaid: parseInt(bp.premium_paid),
           policy: policy
             ? {
@@ -381,10 +405,176 @@ export default function UserDashboard() {
     }
   }
 
+  const fetchUserClaims = async () => {
+    if (!address) return;
+    try {
+      const claims = await getUserClaims(address);
+      console.log("🔍 User claims:", claims);
+      setUserClaims(claims);
+    } catch (error) {
+      console.error("❌ Error fetching user claims:", error);
+      setUserClaims([]);
+    }
+  }
+
+  const handleClaimPolicy = async (policyId: string) => {
+    console.log("📋 CLAIM BUTTON CLICKED - Policy ID:", policyId)
+    
+    if (!address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to claim policies",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!signAndSubmitTransaction) {
+      toast({
+        title: "Error",
+        description: "Please ensure your wallet is properly connected",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Check if policy already has a claim
+    const existingClaim = userClaims.find(claim => claim.policy_id === policyId)
+    if (existingClaim) {
+      toast({
+        title: "Claim Already Exists",
+        description: "You can only make one claim per policy. This policy already has a claim.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setClaiming(policyId)
+
+    try {
+      // Find the policy details
+      const userPolicy = userPolicies.find(p => p.policyId === policyId)
+      if (!userPolicy || !userPolicy.policy) {
+        throw new Error("Policy not found")
+      }
+
+      const claimAmountINR = userPolicy.policy.coverage.amount
+
+      // Call server route to run AI scoring and transfer funds (if APPROVED)
+      const res = await fetch("/api/claims/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          policyId,
+          userAddress: address,
+          claimAmountINR,
+        }),
+      })
+
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(text || "Claim submission failed")
+      }
+
+      const data = await res.json() as {
+        success: boolean
+        policyId: string
+        userAddress: string
+        claimAmountINR: number
+        aggregateScore: number
+        status: "APPROVED" | "PENDING" | "REJECTED"
+        requiresTransfer: boolean
+        transferAmount: number
+      }
+
+      let txHash: string | null = null;
+
+      // If APPROVED, trigger admin-to-user transfer via user's wallet
+      if (data.status === "APPROVED" && data.requiresTransfer) {
+        try {
+          // Show wallet popup for fund transfer confirmation
+          const transferTransaction = {
+            data: {
+              function: "0x1::coin::transfer",
+              typeArguments: ["0x1::aptos_coin::AptosCoin"],
+              functionArguments: [address, data.transferAmount.toString()],
+            },
+          };
+
+          // This will open the user's wallet to confirm the admin transfer
+          const fundRes = await fetch("/api/admin/fund-claim", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userAddress: address,
+              amountOctas: data.transferAmount,
+            }),
+          });
+
+          if (fundRes.ok) {
+            const fundData = await fundRes.json();
+            txHash = fundData.txHash;
+            
+            // Show detailed transfer info
+            console.log("💰 Fund Transfer Completed:", {
+              from: "Admin Account",
+              to: address,
+              amount: fundData.amountAPT + " APT",
+              txHash: fundData.txHash
+            });
+          } else {
+            console.error("❌ Admin funding failed:", await fundRes.text());
+          }
+        } catch (transferError) {
+          console.error("❌ Transfer failed:", transferError);
+        }
+      }
+
+      const statusCode = data.status === 'APPROVED' ? 1 : data.status === 'REJECTED' ? 3 : 2
+      const transferAmountAPT = data.transferAmount ? (data.transferAmount / 100000000).toFixed(4) : '0'
+      
+      const statusMessage = data.status === 'APPROVED'
+        ? `💰 CLAIM APPROVED! ${transferAmountAPT} APT transferred to your wallet${txHash ? ` (TX: ${txHash.slice(0, 10)}...)` : ''}`
+        : data.status === 'REJECTED'
+        ? '❌ Claim REJECTED - High fraud risk detected'
+        : '⏳ Claim PENDING - Awaiting admin review'
+
+      toast({
+        title: data.status === 'APPROVED' ? `💸 ${transferAmountAPT} APT Received!` : `Claim ${data.status}`,
+        description: `Fraud Score: ${data.aggregateScore}/100 | ${statusMessage}`,
+      })
+
+      // Add claim to local state
+      const newClaim = {
+        claim_id: (txHash || `claim_${Date.now()}`),
+        policy_id: policyId,
+        user_address: address,
+        claim_amount: claimAmountINR.toString(),
+        aggregate_score: data.aggregateScore,
+        status: statusCode,
+        claimed_at: new Date().toISOString(),
+        processed_at: new Date().toISOString(),
+      }
+
+      setUserClaims(prev => [...prev, newClaim])
+      await fetchUserPolicies()
+
+    } catch (error) {
+      console.error("❌ Claim error:", error)
+      toast({
+        title: "Claim Failed",
+        description: error instanceof Error ? error.message : "Failed to process claim",
+        variant: "destructive"
+      })
+    } finally {
+      setClaiming(null)
+    }
+  }
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
-      await Promise.all([fetchPolicies(), fetchUserPolicies()])
+      await Promise.all([fetchPolicies(), fetchUserPolicies(), fetchUserClaims()])
       setLoading(false)
     }
     
@@ -414,12 +604,30 @@ export default function UserDashboard() {
       <div className="container mx-auto p-6">
         <StateRestorationNotice />
         
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Welcome to Your Policy Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage your insurance policies and explore new coverage options
-          </p>
+                 {/* Welcome Section */}
+         <div className="mb-8">
+           <h1 className="text-3xl font-bold mb-2">Welcome to Your Policy Dashboard</h1>
+           <p className="text-gray-600 dark:text-gray-400">
+             Manage your insurance policies and explore new coverage options
+           </p>
+           
+                       {/* Claim System Status Notice */}
+            <Card className="mt-4 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10">
+              <CardContent className="p-4">
+                <div className="flex items-center">
+                  <FileText className="h-5 w-5 text-green-600 mr-3" />
+                  <div>
+                    <h3 className="font-semibold text-green-800 dark:green-200">
+                      ✅ Claim System Active!
+                    </h3>
+                    <p className="text-sm text-green-700 dark:green-300">
+                      The AI-powered claim system with fraud detection is now working! 
+                      Click "Make Claim" on active policies to test the complete fraud analysis and claim process.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           
           {/* User Status */}
           <div className="mt-4 flex flex-wrap gap-2 items-center">
@@ -485,7 +693,7 @@ export default function UserDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -533,7 +741,21 @@ export default function UserDashboard() {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Claims Made</p>
                   <p className="text-2xl font-bold">
-                    {userPolicies.reduce((sum, p) => sum + (p.claimsHistory?.length || 0), 0)}
+                    {userClaims.length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <TrendingUp className="h-8 w-8 text-red-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Claim Amount</p>
+                  <p className="text-2xl font-bold">
+                    ₹{userClaims.reduce((sum, c) => sum + parseInt(c.claim_amount), 0).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -677,6 +899,10 @@ export default function UserDashboard() {
                           <p className="text-sm text-gray-600 dark:text-gray-400">Premium Paid</p>
                           <p className="font-semibold">₹{userPolicy.premiumPaid.toLocaleString()}</p>
                         </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Policy Status</p>
+                          <p className="font-semibold">{userPolicy.status}</p>
+                        </div>
                       </div>
                       
                       {userPolicy.nextPremiumDue && (
@@ -688,14 +914,73 @@ export default function UserDashboard() {
                         </div>
                       )}
                       
+                      {userPolicy.status === "Expired" && (
+                        <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900 rounded-lg">
+                          <Clock className="h-4 w-4 text-red-600" />
+                          <span className="text-sm text-red-600 dark:text-red-400">
+                            Policy expired. Claims cannot be made on expired policies.
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Show claim history if any */}
+                      {userClaims.filter(claim => claim.policy_id === userPolicy.policyId).length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Claim History:</p>
+                          {userClaims
+                            .filter(claim => claim.policy_id === userPolicy.policyId)
+                            .map((claim, index) => (
+                              <div key={claim.claim_id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-500">Claim #{claim.claim_id}</span>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={getClaimStatusColor(claim.status)}
+                                  >
+                                    {getClaimStatusString(claim.status)}
+                                  </Badge>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  Score: {claim.aggregate_score}/100
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                      
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" className="flex-1">
                           <FileText className="h-4 w-4 mr-2" />
                           View Details
                         </Button>
-                        <Button variant="outline" size="sm" className="flex-1">
-                          Make Claim
-                        </Button>
+                                                                         <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          disabled={
+                            userPolicy.status !== "Active" || 
+                            claiming === userPolicy.policyId ||
+                            userClaims.some(claim => claim.policy_id === userPolicy.policyId)
+                          }
+                          onClick={() => handleClaimPolicy(userPolicy.policyId)}
+                        >
+                           {claiming === userPolicy.policyId ? (
+                             <>
+                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                               Processing Claim...
+                             </>
+                           ) : userClaims.some(claim => claim.policy_id === userPolicy.policyId) ? (
+                             <>
+                               <FileText className="h-4 w-4 mr-2" />
+                               Claim Submitted
+                             </>
+                           ) : (
+                             <>
+                               <FileText className="h-4 w-4 mr-2" />
+                               Make Claim
+                             </>
+                           )}
+                         </Button>
                       </div>
                     </CardContent>
                   </Card>

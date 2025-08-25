@@ -34,7 +34,7 @@ export default function UserOnboarding() {
                     <div>
                       <h3 className="text-xl font-bold mb-2">Secure Account Setup</h3>
                       <p className="text-gray-600 dark:text-gray-400">
-                        Create your blockchain-secured account with multi-factor authentication for maximum protection.
+                        Create your secured account with multi-factor authentication for maximum protection.
                       </p>
                     </div>
                   </div>
@@ -85,15 +85,15 @@ export default function UserOnboarding() {
             </div>
 
             <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6 mb-8">
-              <h3 className="text-xl font-bold mb-4">Blockchain Security Benefits</h3>
+              <h3 className="text-xl font-bold mb-4">Security Benefits</h3>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-[#fa6724]" />
-                  <span>Immutable claim records prevent fraud and tampering</span>
+                  <span>Secure claim records prevent fraud and tampering</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-[#fa6724]" />
-                  <span>Smart contracts automate verification and payouts</span>
+                  <span>Automated verification and payouts</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-[#fa6724]" />
@@ -101,7 +101,7 @@ export default function UserOnboarding() {
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-[#fa6724]" />
-                  <span>Decentralized storage protects your sensitive data</span>
+                  <span>Secure storage protects your sensitive data</span>
                 </div>
               </div>
             </div>

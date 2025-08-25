@@ -199,26 +199,38 @@ class FraudDetectionAPI {
 
   // Generate demo/mock fraud analysis for testing
   generateMockAnalysis(claimAmount: number, policyId: string): FraudAnalysisResponse {
-    // Simple mock logic based on claim amount and policy
+    // Simple mock logic based on claim amount and policy - HEAVILY FAVOR 0-30 (APPROVED)
     const randomFactor = Math.random();
-    const amountFactor = Math.min(claimAmount / 100000, 1); // Normalize to 0-1
+    const amountFactor = Math.min(claimAmount / 500000, 1); // Higher threshold for risk
     
-    // Generate scores (higher claim amounts = higher risk)
-    const ai1_score = Math.floor((amountFactor * 40 + randomFactor * 30));
-    const ai2_score = Math.floor((amountFactor * 35 + randomFactor * 25));
-    const ai3_score = Math.floor((amountFactor * 30 + randomFactor * 20));
+    // Generate lower scores (much higher chance of approval)
+    const ai1_score = Math.floor((amountFactor * 20 + randomFactor * 15)); // Reduced from 40+30
+    const ai2_score = Math.floor((amountFactor * 18 + randomFactor * 12)); // Reduced from 35+25  
+    const ai3_score = Math.floor((amountFactor * 15 + randomFactor * 10)); // Reduced from 30+20
     
-    const aggregate_score = Math.floor((ai1_score * 0.3 + ai2_score * 0.4 + ai3_score * 0.3));
+    let aggregate_score = Math.floor((ai1_score * 0.3 + ai2_score * 0.4 + ai3_score * 0.3));
+    
+    // AVOID 31-70 range (PENDING status) - HEAVILY FAVOR APPROVED (85% chance)
+    if (aggregate_score > 30 && aggregate_score <= 70) {
+      aggregate_score = Math.random() < 0.85 ? Math.floor(Math.random() * 31) : (71 + Math.floor(Math.random() * 29));
+    }
+    
+    // Additional boost - if score is still high, give it another chance to be low
+    if (aggregate_score > 30) {
+      if (Math.random() < 0.7) { // 70% chance to force approval
+        aggregate_score = Math.floor(Math.random() * 31); // Force to 0-30
+      }
+    }
     
     const risk_level: 'LOW' | 'MEDIUM' | 'HIGH' = 
-      aggregate_score <= 30 ? 'LOW' : 
-      aggregate_score <= 70 ? 'MEDIUM' : 'HIGH';
+      aggregate_score <= 30 ? 'LOW' : 'HIGH'; // No MEDIUM anymore
 
-    console.log('🎭 Generated mock fraud analysis:', {
+    console.log('🎭 Generated mock fraud analysis (APPROVAL FAVORED):', {
       policy_id: policyId,
       claim_amount: claimAmount,
       aggregate_score,
-      risk_level
+      risk_level,
+      status: aggregate_score <= 30 ? 'APPROVED ✅' : 'REJECTED ❌'
     });
 
     return {

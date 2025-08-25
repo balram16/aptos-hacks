@@ -7,10 +7,8 @@ declare global {
   }
 }
 
-// Contract address for devnet
-export const CONTRACT_ADDRESS = "0x570f8be36f111c0bf48e788881303086348e2844341474cda63dc6b3a36c7e0a";
+export const CONTRACT_ADDRESS = "";
 
-// Initialize Aptos client for devnet
 const aptosConfig = new AptosConfig({ network: Network.DEVNET });
 const aptos = new Aptos(aptosConfig);
 

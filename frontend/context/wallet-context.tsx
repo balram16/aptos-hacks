@@ -39,7 +39,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   const connectWallet = async () => {
     try {
       setIsLoading(true)
-      await connect("Petra" as any) // Type assertion for Petra wallet
+      await connect("Petra" as any)
     } catch (error) {
       console.error("Failed to connect wallet:", error)
     } finally {

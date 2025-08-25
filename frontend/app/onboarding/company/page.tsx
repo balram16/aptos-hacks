@@ -495,7 +495,7 @@ export default function CompanyOnboarding() {
           <div className="bg-gradient-to-r from-[#07a6ec] to-[#fa6724] p-8 text-white">
             <h1 className="text-3xl font-bold mb-4">Insurance Company Onboarding</h1>
             <p className="text-lg opacity-90">
-              Welcome to ChainSure! Let's set up your company account and integrate our blockchain-powered claims
+              Welcome to ChainSure! Let's set up your company account and integrate our claims
               processing system.
             </p>
           </div>
@@ -513,7 +513,7 @@ export default function CompanyOnboarding() {
                     <div>
                       <h3 className="text-xl font-bold mb-2">Company Profile</h3>
                       <p className="text-gray-600 dark:text-gray-400">
-                        Set up your company profile with verification and blockchain integration for secure operations.
+                        Set up your company profile with verification for secure operations.
                       </p>
                     </div>
                   </div>
@@ -527,7 +527,7 @@ export default function CompanyOnboarding() {
                     <div>
                       <h3 className="text-xl font-bold mb-2">Policy Configuration</h3>
                       <p className="text-gray-600 dark:text-gray-400">
-                        Configure your insurance policies and smart contract parameters for automated claim processing.
+                        Configure your insurance policies and automated parameters for claim processing.
                       </p>
                     </div>
                   </div>
@@ -564,7 +564,7 @@ export default function CompanyOnboarding() {
             </div>
 
             <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6 mb-8">
-              <h3 className="text-xl font-bold mb-4">Blockchain Integration Benefits</h3>
+              <h3 className="text-xl font-bold mb-4">Integration Benefits</h3>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-[#07a6ec]" />
@@ -576,7 +576,7 @@ export default function CompanyOnboarding() {
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-[#07a6ec]" />
-                  <span>Automate claim verification with smart contracts</span>
+                  <span>Automate claim verification</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-[#07a6ec]" />

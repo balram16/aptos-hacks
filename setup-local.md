@@ -1,4 +1,4 @@
-# 🏠 Local Development Setup
+🏠 Local Development Setup
 
 ## ✅ सब कुछ Local पर Setup हो गया है!
 
